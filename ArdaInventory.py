@@ -31,39 +31,49 @@ class ArdaInventory(object):
         self.PRO_b = None
         self.STR = None
         self.IMP = None
+        self.PRO_header = None
         
         # Index Lists
         self.index_str = None
         self.index_pro_b = None
         self.index_pro_f = None
         self.index_imp = None
-        
+
         self._arda_default_labels = index_columns
-        
-        
-        
+
+
+
     def extract_labels_from_matdict(self, matdict):
 
         try:
             self.STR = mlt.mine_nested_array(matdict['STR'])
             self.index_str = self.STR[:,self._arda_default_labels].T.tolist()
-        except: pass
-            
+        except:
+            pass
+
         try:
             self.PRO_b = mlt.mine_nested_array(matdict['PRO_gen'])
             self.index_pro_b = self.PRO_b[:, self._arda_default_labels].T.tolist()
-        except: pass
+        except:
+            pass
 
         try:
             self.IMP = mlt.mine_nested_array(matdict['IMP'])
             self.index_imp = self.IMP[:, self._arda_default_labels].T.tolist()
-        except: pass
+        except:
+            pass
 
         try:
             self.PRO_f = mlt.mine_nested_array(matdict['PRO_f'])
             self.index_pro_f = self.PRO_f[:, self._arda_default_labels].T.tolist()
-        except: pass
-        
+        except:
+            pass
+
+        try:
+            self.PRO_header = mlt.mine_nested_array(matdict['PRO_header'])
+        except:
+            pass
+
     def extract_background_from_matdict(self, matdict):
         
         self.extract_labels_from_matdict(matdict)
@@ -130,12 +140,18 @@ class ArdaInventory(object):
                     'y_f': scipy.sparse.csc_matrix(self.y_f.values),
                     'PRO_f': self.PRO_f,
                     'PRO_gen': self.PRO_b,
-                    'STR': self.PRO_b                   
+                    'STR': self.PRO_b
                    }
+
+        try:
+            matdict['PRO_header'] = self.PRO_header
+        except:
+            pass
+
         return matdict
-    
+
     def export_system_to_matdict(self):
-            
+
         matdict_fore = self.export_foreground_to_matdict()
         matdict = {
                     'A_gen': scipy.sparse.csc_matrix(self.A_bb.values),
@@ -144,10 +160,10 @@ class ArdaInventory(object):
                     'y_gen': scipy.sparse.csc_matrix(self.y_f.values),
                     'PRO_gen': self.PRO_b,
                     'STR': self.PRO_b,
-                    'IMP': self.IMP 
+                    'IMP': self.IMP
                    }
         matdict.update(matdict_fore)
-            
+
         return matdict
         
     
