@@ -19,7 +19,7 @@ class ArdaInventory(object):
         self.A_ff = pd.DataFrame() 
         self.A_bf = pd.DataFrame() 
         self.A_bb = pd.DataFrame() 
-        self.A_fb = pd.DataFrame() 
+        #self.A_fb = pd.DataFrame() 
     
         self.F_f = pd.DataFrame()
         self.F_b = pd.DataFrame()
@@ -229,6 +229,13 @@ class ArdaInventory(object):
                                       order_axis=[0])
 
 
+    def increase_foreground_process_ids(self, shift=0):
+        self.A_ff.index += shift
+        self.A_ff.columns += shift
+        self.y_f.index += shift
+        self.A_bf.columns += shift
+        self.F_f.columns += shift
+        self.PRO_f[:,self._ardaId_column] += shift
             
 
 

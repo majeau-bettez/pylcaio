@@ -320,7 +320,20 @@ class TestArdaInventory(unittest.TestCase):
 
         assert_frames_equivalent(a.A_bf, A_bf)
 
-        IPython.embed()
+    def test_change_process_ids(self):
+        a = ArdaInventory.ArdaInventory([1])
+        a.extract_foreground_from_matdict(self.matdict)
+
+        a.increase_foreground_process_ids(70000)
+
+        A_ff = pd.DataFrame({80001: {80001: 0, 80002: 10},
+                             80002: {80001: 1, 80002: 11}})
+        assert_frames_equivalent(a.A_ff, A_ff)
+
+
+        PRO_f =  np.array([['s+orm', 80001, 'kg'],
+                           ['Batt Packing', 80002, 'kg']], dtype=object)
+        assert(np.all(a.PRO_f == PRO_f))
 
 #=========================================================
 def assert_frames_equivalent(df1, df2, **kwds):
