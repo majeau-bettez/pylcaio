@@ -3,6 +3,7 @@ import pandas as pd
 import scipy.io as sio
 import scipy.sparse
 import sys
+import IPython
 
 sys.path.append('/home/bill/software/Python/Modules/')
 import matlab_tools as mlt
@@ -12,19 +13,19 @@ class ArdaInventory(object):
     """ A common data structure for an Arda template"""
 
 
-    def __init__(self, index_columns=[0, 1, -1]):
+    def __init__(self, index_columns=[1]):
     
         # Main matrices, as Pandas Dataframes ()
-        self.A_ff = None
-        self.A_bf = None
-        self.A_bb = None
-        self.A_fb = None
+        self.A_ff = pd.DataFrame() 
+        self.A_bf = pd.DataFrame() 
+        self.A_bb = pd.DataFrame() 
+        self.A_fb = pd.DataFrame() 
     
-        self.F_f = None
-        self.F_b = None
-        self.C = None
-        self.y_f = None
-        self.y_b = None
+        self.F_f = pd.DataFrame()
+        self.F_b = pd.DataFrame()
+        self.C = pd.DataFrame()
+        self.y_f = pd.DataFrame()
+        self.y_b = pd.DataFrame()
     
         # Labels as numpy arrays
         self.PRO_f = None
@@ -40,6 +41,7 @@ class ArdaInventory(object):
         self.index_imp = None
 
         self._arda_default_labels = index_columns
+        self._ardaId_column = 1
 
 
 
@@ -166,5 +168,67 @@ class ArdaInventory(object):
 
         return matdict
         
-    
+    def delete_processes_foreground(self, id_begone=[], id_col=1):
+
+            bo_begone = np.zeros(self.PRO_f.shape[0], dtype=bool)
+            for i in id_begone:
+                bo_begone += self.PRO_f[:,1] == i
+
+            self.A_ff = self.A_ff.drop(id_begone, 0).drop(id_begone, 1)
+            self.A_bf = self.A_bf.drop(id_begone, 1)
+            self.F_f = self.F_f.drop(id_begone, 1)
+            self.y_f = self.y_f.drop(id_begone, 0)
+
+            self.PRO_f = self.PRO_f[~ bo_begone, :]
+
+    def append_to_foreground(self, other):
+
+        
+
+        # check if no duplicate index in dataframes
+        if len(self.A_ff.index - other.A_ff.index) < len(self.A_ff.index):
+            raise ValueError("The two inventories share common foreground"
+                             " labels. I will not combine them.")
+
+        # double check with label
+        diff = (set(self.PRO_f[:, self._ardaId_column]) - 
+                set(other.PRO_f[:, other._ardaId_column]))
+        if len(diff) < self.PRO_f.shape[0]:
+            raise ValueError("The two inventories share common ardaIds"
+                             " labels. I will not combine them.")
+        
+        # concatenate labels
+        self.PRO_f = np.vstack([self.PRO_f, other.PRO_f])
+
+        def concat_keep_order(frame_list, axis=0, index=None, order_axis=[0]):
+            c = pd.concat(frame_list, axis).fillna(0)
+            for i in order_axis:
+                c = c.reindex_axis(index, axis=i)
+            return c
+
+        index = self.PRO_f[:, self._arda_default_labels]
+        # concatenate data
+        self.A_ff = concat_keep_order([self.A_ff, other.A_ff],
+                                      index=index,
+                                      order_axis=[0,1])
+                                         
+
+        self.A_bf = concat_keep_order([self.A_bf, other.A_bf],
+                                      index=index,
+                                      axis=1,
+                                      order_axis=[1])
+
+        self.F_f = concat_keep_order([self.F_f, other.F_f],
+                                      axis=1,
+                                      index=index,
+                                      order_axis=[1])
+
+        self.y_f = concat_keep_order([self.y_f, other.y_f],
+                                      axis=0,
+                                      index=index,
+                                      order_axis=[0])
+
+
+            
+
 
