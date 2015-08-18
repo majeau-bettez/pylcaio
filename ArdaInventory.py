@@ -14,26 +14,26 @@ class ArdaInventory(object):
 
 
     def __init__(self, index_columns=[1]):
-    
+
         # Main matrices, as Pandas Dataframes ()
-        self.A_ff = pd.DataFrame() 
-        self.A_bf = pd.DataFrame() 
-        self.A_bb = pd.DataFrame() 
-        #self.A_fb = pd.DataFrame() 
-    
+        self.A_ff = pd.DataFrame()
+        self.A_bf = pd.DataFrame()
+        self.A_bb = pd.DataFrame()
+        #self.A_fb = pd.DataFrame()
+
         self.F_f = pd.DataFrame()
         self.F_b = pd.DataFrame()
         self.C = pd.DataFrame()
         self.y_f = pd.DataFrame()
         self.y_b = pd.DataFrame()
-    
+
         # Labels as numpy arrays
         self.PRO_f = None
         self.PRO_b = None
         self.STR = None
         self.IMP = None
         self.PRO_header = None
-        
+
         # Index Lists
         self.index_str = None
         self.index_pro_b = None
@@ -119,7 +119,7 @@ class ArdaInventory(object):
         
     def match_foreground_to_background(self):
         
-        F_f_new = self.F_f.reindex_axis(self.F_b.index, axis=0).fillna(0)
+        F_f_new = self.F_f.reindex_axis(self.F_b.index, axis=0).fillna(0.0)
         
         if F_f_new.sum().sum() != self.F_f.sum().sum():
             raise ValueError('Some of the emissions are not conserved during'
@@ -127,7 +127,7 @@ class ArdaInventory(object):
         else:
             self.F_f = F_f_new
             
-        A_bf_new = self.A_bf.reindex_axis(self.A_bb.index, axis=0).fillna(0)
+        A_bf_new = self.A_bf.reindex_axis(self.A_bb.index, axis=0).fillna(0.0)
         if A_bf_new.sum().sum() != self.A_bf.sum().sum():
             raise ValueError('Some of the product-flows are not conserved'
                     ' during the re-indexing! Will not re-index A_bf')
@@ -181,9 +181,8 @@ class ArdaInventory(object):
 
             self.PRO_f = self.PRO_f[~ bo_begone, :]
 
-    def append_to_foreground(self, other):
+    def append_to_foreground(self, other, final_demand=False):
 
-        
 
         # check if no duplicate index in dataframes
         if len(self.A_ff.index - other.A_ff.index) < len(self.A_ff.index):
@@ -196,12 +195,12 @@ class ArdaInventory(object):
         if len(diff) < self.PRO_f.shape[0]:
             raise ValueError("The two inventories share common ardaIds"
                              " labels. I will not combine them.")
-        
+
         # concatenate labels
         self.PRO_f = np.vstack([self.PRO_f, other.PRO_f])
 
         def concat_keep_order(frame_list, axis=0, index=None, order_axis=[0]):
-            c = pd.concat(frame_list, axis).fillna(0)
+            c = pd.concat(frame_list, axis).fillna(0.0)
             for i in order_axis:
                 c = c.reindex_axis(index, axis=i)
             return c
@@ -211,7 +210,7 @@ class ArdaInventory(object):
         self.A_ff = concat_keep_order([self.A_ff, other.A_ff],
                                       index=index,
                                       order_axis=[0,1])
-                                         
+
 
         self.A_bf = concat_keep_order([self.A_bf, other.A_bf],
                                       index=index,
@@ -223,10 +222,14 @@ class ArdaInventory(object):
                                       index=index,
                                       order_axis=[1])
 
-        self.y_f = concat_keep_order([self.y_f, other.y_f],
-                                      axis=0,
-                                      index=index,
-                                      order_axis=[0])
+        if final_demand:
+            self.y_f = concat_keep_order([self.y_f, other.y_f],
+                                          axis=0,
+                                          index=index,
+                                          order_axis=[0])
+        else:
+            self.y_f = self.y_f.reindex(self.A_ff.index).fillna(0.0)
+
 
 
     def increase_foreground_process_ids(self, shift=0):
