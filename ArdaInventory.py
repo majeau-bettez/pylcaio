@@ -43,7 +43,15 @@ class ArdaInventory(object):
         self._arda_default_labels = index_columns
         self._ardaId_column = 1
 
+        self.A_io = pd.DataFrame()
+        self.A_io_f = pd.DataFrame()
+        self.F_io = pd.DataFrame()
+        self.F_io_f = pd.DataFrame()
+        self.PRO_io = np.array([])
+        self.STR_io = np.array([])
+        self.IMP_io = np.array([])
 
+        self.io_material_sectors=np.array([])
 
     def extract_labels_from_matdict(self, matdict):
 
@@ -110,13 +118,23 @@ class ArdaInventory(object):
         self.F_f = pd.DataFrame(data=matdict['F_f'].toarray(),
                                 index=self.index_str,
                                 columns=self.index_pro_f)
-        
+
         try:
             self.y_f = pd.DataFrame(data=matdict['y_f'].toarray(),
                                     index=self.index_pro_f)
         except:
             raise Warning('No final demand found')
-        
+
+    def extract_io_background(self,mrio):
+        self.A_io = mrio.A.copy()
+        self.F_io = pd.concat([mrio.emissions.S, mrio.factor_inputs.S])
+
+        self.A_io_f = pd.DataFrame(index=self.A_io.index,
+                                   columns=self.A_ff.columns).fillna(0.0)
+
+        self.F_io_f = pd.DataFrame(index=self.F_io.index,
+                                   columns=self.A_ff.columns).fillna(0.0)
+
     def match_foreground_to_background(self):
 
         F_f_new = self.F_f.reindex_axis(self.F_b.index, axis=0).fillna(0.0)
@@ -248,5 +266,19 @@ class ArdaInventory(object):
         self.F_f.columns += shift
         self.PRO_f[:,self._ardaId_column] += shift
             
+
+
+    def hybridize_process(self, fore_id, region, sector, price,
+            full_material=True, full_emissions=True,
+            doublecounted_sectors = None):
+
+        self.A_io_f.ix[:,fore_id] = self.A_io[region, sector]*price
+
+        if full_material:
+            bo = self.A_io_f.index.levels[1].isin(self.io_material_sectors)
+            self.A_io_f.ix[bo,fore_id] = 0.0
+
+        if not full_emissions:
+            self.F_io_f.ix[:, fore_id] =self.F_io[region, sector]*price
 
 
