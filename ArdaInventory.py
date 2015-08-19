@@ -28,11 +28,11 @@ class ArdaInventory(object):
         self.y_b = pd.DataFrame()
 
         # Labels as numpy arrays
-        self.PRO_f = None
-        self.PRO_b = None
-        self.STR = None
-        self.IMP = None
-        self.PRO_header = None
+        self.PRO_f = np.array([])
+        self.PRO_b = np.array([])
+        self.STR = np.array([])
+        self.IMP = np.array([])
+        self.PRO_header = np.array([])
 
         # Index Lists
         self.index_str = None
@@ -118,15 +118,15 @@ class ArdaInventory(object):
             raise Warning('No final demand found')
         
     def match_foreground_to_background(self):
-        
+
         F_f_new = self.F_f.reindex_axis(self.F_b.index, axis=0).fillna(0.0)
-        
+
         if F_f_new.sum().sum() != self.F_f.sum().sum():
             raise ValueError('Some of the emissions are not conserved during'
                     ' the re-indexing! Will not re-index F_f')
         else:
             self.F_f = F_f_new
-            
+
         A_bf_new = self.A_bf.reindex_axis(self.A_bb.index, axis=0).fillna(0.0)
         if A_bf_new.sum().sum() != self.A_bf.sum().sum():
             raise ValueError('Some of the product-flows are not conserved'
@@ -142,7 +142,7 @@ class ArdaInventory(object):
                     'y_f': scipy.sparse.csc_matrix(self.y_f.values),
                     'PRO_f': self.PRO_f,
                     'PRO_gen': self.PRO_b,
-                    'STR': self.PRO_b
+                    'STR': self.STR
                    }
 
         try:
@@ -197,7 +197,15 @@ class ArdaInventory(object):
                              " labels. I will not combine them.")
 
         # concatenate labels
+
+        # for the Ids, make sure that they all have the same type. Software
+        # like matlab complain when different types are mixed (e.g., int64,
+        # uint16, etc.)
+        the_type = type( other.PRO_f[0, self._ardaId_column])
         self.PRO_f = np.vstack([self.PRO_f, other.PRO_f])
+        self.PRO_f[:, self._ardaId_column] = np.array(
+                self.PRO_f[:,self._ardaId_column], dtype=the_type)
+
 
         def concat_keep_order(frame_list, axis=0, index=None, order_axis=[0]):
             c = pd.concat(frame_list, axis).fillna(0.0)
