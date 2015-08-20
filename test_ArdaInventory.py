@@ -58,10 +58,10 @@ class TestArdaInventory(unittest.TestCase):
                                             ['back04', 4, 'MJ']], dtype=object)
 
 
-        self.matdict['A_bf'] = scipy.sparse.csc_matrix([[0, 1],
-                                                        [1, 0],
-                                                        [1, 0],
-                                                        [0, 0]])
+        self.matdict['A_bf'] = scipy.sparse.csc_matrix([[0.0, 1.0],
+                                                        [1.0, 0.0],
+                                                        [1.0, 0.0],
+                                                        [0.0, 0.0]])
 
         self.matdict['F_gen'] = scipy.sparse.csc_matrix(np.zeros((3,4)))
 
@@ -104,6 +104,47 @@ class TestArdaInventory(unittest.TestCase):
 
         self.smalldict['y_gen'] = scipy.sparse.csc_matrix(np.zeros((3, 1)))
         self.smalldict['F_gen'] = scipy.sparse.csc_matrix(np.zeros((3, 3)))
+
+
+    def test_append_to_foreground(self):
+        print('test_append')
+        a = ArdaInventory.ArdaInventory(1)
+        b = ArdaInventory.ArdaInventory(1)
+        a.extract_background_from_matdict(self.matdict)
+        a.extract_foreground_from_matdict(self.matdict)
+
+        B = {}
+        B['PRO_f'] = np.array([ ['foo', 10, 'kg']],
+                                          dtype=object)
+
+        B['A_bf'] = scipy.sparse.csc_matrix([[1.0],
+                                             [0.0],
+                                             [0.0],
+                                             [0.0]])
+
+        B['PRO_header'] = np.array([['FULL NAME', 'MATRIXID','UNIT']])
+
+        B['A_ff'] = scipy.sparse.csc_matrix([[11.0]])
+
+        # WITH THREE STRESSORS
+
+        B['STR'] = np.array([['stress01', 1614, 'kg'],
+                             ['stress02', 1615, 'kg'],
+                             ['stress03', 1616, 'kg']], dtype=object)
+
+        B['F_f'] = scipy.sparse.csc_matrix([[ 0.0],
+                                            [ 0.2],
+                                            [ 0.0]])
+
+        B['y_f'] = scipy.sparse.csc_matrix([[2.0]])
+
+        b.extract_background_from_matdict(self.matdict)
+        b.extract_foreground_from_matdict(B)
+
+        a.append_to_foreground(b)
+
+        y_f = pd.DataFrame({0: {10001: 1.0, 10002: 0.0, 10: 0.0}})
+        assert_frames_equivalent(a.y_f, y_f)
 
 
     def test_import_and_export_matdict_keys_roundtrip(self):
@@ -181,6 +222,7 @@ class TestArdaInventory(unittest.TestCase):
         B['y_f'] = scipy.sparse.csc_matrix([[0.0]])
 
         b = ArdaInventory.ArdaInventory(1)
+        b.extract_background_from_matdict(self.matdict)
         b.extract_foreground_from_matdict(B)
         pdt.assert_frame_equal(a.A_ff, b.A_ff)
         pdt.assert_frame_equal(a.F_f, b.F_f)
@@ -201,16 +243,17 @@ class TestArdaInventory(unittest.TestCase):
     def test_append_to_foreground_with_final_demand(self):
         a = ArdaInventory.ArdaInventory(1)
         b = ArdaInventory.ArdaInventory(1)
-        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_background_from_matdict(self.matdict)
+        b.extract_background_from_matdict(self.matdict)
 
         B = {}
         B['PRO_f'] = np.array([ ['foo', 10, 'kg']],
                                           dtype=object)
 
-        B['A_bf'] = scipy.sparse.csc_matrix([[1],
-                                             [0],
-                                             [0],
-                                             [0]])
+        B['A_bf'] = scipy.sparse.csc_matrix([[1.0],
+                                             [0.0],
+                                             [0.0],
+                                             [0.0]])
 
         B['PRO_header'] = np.array([['FULL NAME', 'MATRIXID','UNIT']])
 
@@ -228,6 +271,7 @@ class TestArdaInventory(unittest.TestCase):
 
         B['y_f'] = scipy.sparse.csc_matrix([[2.0]])
 
+        a.extract_foreground_from_matdict(self.matdict)
         b.extract_foreground_from_matdict(B)
 
         a.append_to_foreground(b, final_demand=True)
@@ -238,9 +282,10 @@ class TestArdaInventory(unittest.TestCase):
                              10002: {10001: 1.0, 10002: 11.0, 10: 0.0}})
         assert_frames_equivalent(a.A_ff, A_ff)
 
-        A_bf = pd.DataFrame({10001: {0: 0.0, 1: 0.0, 2: 1.0, 3: 1.0, 4: 0.0},
-                             10002: {0: 0.0, 1: 1.0, 2: 0.0, 3: 0.0, 4: 0.0},
-                             10: {0: 1.0, 1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0}})
+        A_bf = pd.DataFrame({10001: {1: 0.0, 2: 1.0, 3: 1.0, 4: 0.0},
+                             10002: {1: 1.0, 2: 0.0, 3: 0.0, 4: 0.0},
+                             10:    {1: 1.0, 2: 0.0, 3: 0.0, 4: 0.0}})
+
         assert_frames_equivalent(a.A_bf, A_bf)
 
         F_f = pd.DataFrame(
@@ -255,47 +300,7 @@ class TestArdaInventory(unittest.TestCase):
         assert_frames_equivalent(a.y_f, y_f)
 
         # check that order is right
-        assert(np.all(a.PRO_f[:,a._arda_default_labels] == a.A_ff.index.values))
-
-    def test_append_to_foreground(self):
-        a = ArdaInventory.ArdaInventory(1)
-        b = ArdaInventory.ArdaInventory(1)
-        a.extract_foreground_from_matdict(self.matdict)
-
-        B = {}
-        B['PRO_f'] = np.array([ ['foo', 10, 'kg']],
-                                          dtype=object)
-
-        B['A_bf'] = scipy.sparse.csc_matrix([[1],
-                                             [0],
-                                             [0],
-                                             [0]])
-
-        B['PRO_header'] = np.array([['FULL NAME', 'MATRIXID','UNIT']])
-
-        B['A_ff'] = scipy.sparse.csc_matrix([[11.0]])
-
-        # WITH THREE STRESSORS
-
-        B['STR'] = np.array([['stress01', 1614, 'kg'],
-                             ['stress02', 1615, 'kg'],
-                             ['stress03', 1616, 'kg']], dtype=object)
-
-        B['F_f'] = scipy.sparse.csc_matrix([[ 0.0],
-                                            [ 0.2],
-                                            [ 0.0]])
-
-        B['y_f'] = scipy.sparse.csc_matrix([[2.0]])
-
-        b.extract_foreground_from_matdict(B)
-
-        a.append_to_foreground(b)
-
-        IPython.embed()
-
-        y_f = pd.DataFrame({0: {10001: 1.0, 10002: 0.0, 10: 0.0}})
-        assert_frames_equivalent(a.y_f, y_f)
-
+        assert(np.all(a.PRO_f.ix[:,a._arda_default_labels] == a.A_ff.index.values))
 
     def test_append_to_foreground_w_ValueError_w_multiindex(self):
         index = [0, 1 , -1]
@@ -321,14 +326,14 @@ class TestArdaInventory(unittest.TestCase):
                                             ['back03', 3, 'MJ'],
                                             ['back04', 4, 'MJ']], dtype=object)
 
-        B['A_bf'] = scipy.sparse.csc_matrix([[1],
-                                             [0],
-                                             [0],
-                                             [0]])
+        B['A_bf'] = scipy.sparse.csc_matrix([[1.0],
+                                             [0.0],
+                                             [0.0],
+                                             [0.0]])
 
         B['PRO_header'] = np.array([['FULL NAME', 'MATRIXID','UNIT']])
 
-        B['A_ff'] = scipy.sparse.csc_matrix([[11]])
+        B['A_ff'] = scipy.sparse.csc_matrix([[11.0]])
 
         # WITH THREE STRESSORS
 
@@ -342,21 +347,27 @@ class TestArdaInventory(unittest.TestCase):
 
         B['y_f'] = scipy.sparse.csc_matrix([[0]])
 
+        b.extract_background_from_matdict(self.matdict)
         b.extract_foreground_from_matdict(B)
 
         a.append_to_foreground(b)
 
 
-        A_bf = pd.DataFrame( {('foo', 10, 'kg'): {('back01', 1, 'kg'): 1,
-                 ('back03', 3, 'MJ'): 0, ('back04', 4, 'MJ'): 0,
-                     ('back02', 2, 'kg'): 0},
-                 ('Batt Packing', 10002, 'kg'): {('back01', 1, 'kg'): 1,
-                   ('back03', 3, 'MJ'): 0, ('back04', 4, 'MJ'): 0,
-                       ('back02', 2, 'kg'): 0},
-                  ('s+orm', 10001, 'kg'): {('back01', 1, 'kg'): 0,
-                    ('back03', 3, 'MJ'): 1,
-                      ('back04', 4, 'MJ'): 0,
-                        ('back02', 2, 'kg'): 1}})
+        A_bf = pd.DataFrame( {('foo', 10, 'kg'): {('back01', 1, 'kg'): 1.0,
+                                                  ('back03', 3, 'MJ'): 0.0,
+                                                  ('back04', 4, 'MJ'): 0.0,
+                                                  ('back02', 2, 'kg'): 0.0},
+                              ('Batt Packing', 10002, 'kg'):
+                                                 {('back01', 1, 'kg'): 1.0,
+                                                  ('back03', 3, 'MJ'): 0.0,
+                                                  ('back04', 4, 'MJ'): 0.0,
+                                                  ('back02', 2, 'kg'): 0.0},
+                              ('s+orm', 10001, 'kg'): {
+                                                  ('back01', 1, 'kg'): 0.0,
+                                                  ('back03', 3, 'MJ'): 1.0,
+                                                  ('back04', 4, 'MJ'): 0.0,
+                                                  ('back02', 2, 'kg'): 1.0}
+                              })
 
         assert_frames_equivalent(a.A_bf, A_bf)
 
