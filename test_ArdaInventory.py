@@ -12,6 +12,8 @@ import IPython
 sys.path.append('/home/bill/software/Python/Modules/')
 import matlab_tools as mlt
 import matrix_view as mtv
+sys.path.append('/home/bill/software/pymrio/')
+import pymrio
 
 
 class TestArdaInventory(unittest.TestCase):
@@ -152,9 +154,23 @@ class TestArdaInventory(unittest.TestCase):
         a = ArdaInventory.ArdaInventory()
         a.extract_background_from_matdict(self.matdict)
         a.extract_foreground_from_matdict(self.matdict)
-        matdict = a.export_system_to_matdict()
+        matdict = a.export_system_to_matdict(False)
 
         assert(matdict.keys() == self.matdict.keys())
+
+    def test_extract_io_background_from_pymrio(self):
+
+        mrio = pymrio.load_test()
+        mrio.calc_all()
+        a = ArdaInventory.ArdaInventory()
+        a.extract_io_background_from_pymrio(mrio)
+
+        # assertion1
+        assert(np.all(a.A_io.values == mrio.A.values))
+
+        # assertion2: stest extensions preserved
+        self.assertAlmostEqual(a.F_io.values.sum(), mrio.emissions.S.values.sum() +
+                                      mrio.factor_inputs.S.values.sum())
 
     def test_match_foreground_background_trivial(self):
         a = ArdaInventory.ArdaInventory()

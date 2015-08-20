@@ -48,21 +48,45 @@ class ArdaInventory(object):
         self.A_io_f = pd.DataFrame()
         self.F_io = pd.DataFrame()
         self.F_io_f = pd.DataFrame()
+        self.C_io = pd.DataFrame()
 
         self.io_material_sectors=np.array([])
+
+
+    @property
+    def PRO(self):
+        return pd.concat([self.PRO_f, self.PRO_b, self.PRO_io], axis=0)
+
+    @property
+    def STR_all(self):
+        return pd.concat([self.STR, self.STR_io], axis=0)
+
+    @property
+    def IMP_all(self):
+        return pd.concat([self.IMP, self.IMP_io], axis=0)
 
     @property
     def A(self):
         return pd.concat([
                  self.A_ff,
-                 pd.concat([self.A_bf, self.A_bb], axis =1),
+                 pd.concat([self.A_bf, self.A_bb], axis=1),
                  pd.concat([self.A_io_f, self.A_io], axis=1)], axis=0)
-
     @property
     def F(self):
         return pd.concat(
                 [pd.concat([self.F_f, self.F_b], axis=1),
                  pd.concat([self.F_io_f, self.F_io], axis=1)], axis=0)
+    @property
+    def C_all(self):
+        return concat_keep_order([self.C, self.C_io],
+                                 self.STR.index,
+                                 order_axis=[1])
+
+    @property
+    def y(self):
+        y_pro =  pd.concat([self.y_f, self.y_b], axis=0)
+        return y_pro.reindex_axis(self.PRO.index, axis=0).fillna(0.0)
+
 
     def extract_labels_from_matdict(self, matdict):
 
@@ -146,15 +170,36 @@ class ArdaInventory(object):
         except:
             raise Warning('No final demand found')
 
-    def extract_io_background(self,mrio):
+    def extract_io_background_from_pymrio(self,mrio):
+
+        
         self.A_io = mrio.A.copy()
+
+
+        if (isinstance(mrio.emissions.S.index, pd.core.index.MultiIndex) and not
+            isinstance(mrio.factor_inputs.S.index, pd.core.index.MultiIndex)):
+                twice = np.array([mrio.factor_inputs.S.index.values,mrio.factor_inputs.S.index.values ])
+                mrio.factor_inputs.S.index = pd.MultiIndex.from_arrays(twice)
+
         self.F_io = pd.concat([mrio.emissions.S, mrio.factor_inputs.S])
+
+        PRO_io = np.array([list(r) for r in self.A_io.index])
+        self.PRO_io = pd.DataFrame(PRO_io, index=PRO_io.T.tolist())
+
+        STR_io = np.array([list(r) for r in self.F_io.index])
+        self.STR_io = pd.DataFrame(STR_io, index=STR_io.T.tolist())
 
         self.A_io_f = pd.DataFrame(index=self.A_io.index,
                                    columns=self.A_ff.columns).fillna(0.0)
 
         self.F_io_f = pd.DataFrame(index=self.F_io.index,
                                    columns=self.A_ff.columns).fillna(0.0)
+
+        self.IMP_io = self.STR_io.copy()
+        self.C_io = pd.DataFrame(index=self.STR_io.index,
+                                 columns=self.STR_io.index,
+                                 data=np.eye(self.STR_io.index.values.shape[0]))
+
 
     def match_foreground_to_background(self):
 
@@ -191,22 +236,35 @@ class ArdaInventory(object):
 
         return matdict
 
-    def export_system_to_matdict(self):
+    def export_system_to_matdict(self, consolidated=True):
 
-        matdict_fore = self.export_foreground_to_matdict()
-        matdict = {
-                    'A_gen': scipy.sparse.csc_matrix(self.A_bb.values),
-                    'F_gen': scipy.sparse.csc_matrix(self.F_f.values),
-                    'C': scipy.sparse.csc_matrix(self.C.values),
-                    'y_gen': scipy.sparse.csc_matrix(self.y_f.values),
-                    'PRO_gen': self.PRO_b.values,
-                    'STR': self.STR.values,
-                    'IMP': self.IMP
-                   }
-        matdict.update(matdict_fore)
+        if consolidated:
+            matdict = {
+                        'A_gen': self.A.values,
+                        'F_gen': self.F.values,
+                        'C': self.C_all.values,
+                        'y_gen': self.y.values,
+                        'PRO_gen': self.PRO.values,
+                        'STR': self.STR_all.values,
+                        'IMP': self.IMP_all.values
+                        }
+        else:
+
+            matdict_fore = self.export_foreground_to_matdict()
+            matdict = {
+                        'A_gen': scipy.sparse.csc_matrix(self.A_bb.values),
+                        'F_gen': scipy.sparse.csc_matrix(self.F_f.values),
+                        'C': scipy.sparse.csc_matrix(self.C.values),
+                        'y_gen': scipy.sparse.csc_matrix(self.y_f.values),
+                        'PRO_gen': self.PRO_b.values,
+                        'STR': self.STR.values,
+                        'IMP': self.IMP.values
+                       }
+            matdict.update(matdict_fore)
 
         return matdict
         
+    
     def delete_processes_foreground(self, id_begone=[]):
 
             #bo_begone = np.zeros(self.PRO_f.shape[0], dtype=bool)
@@ -244,11 +302,6 @@ class ArdaInventory(object):
         self.PRO_f[self._ardaId_column] = self.PRO_f[self._ardaId_column].astype(the_type)
 
 
-        def concat_keep_order(frame_list, index, axis=0, order_axis=[0]):
-            c = pd.concat(frame_list, axis).fillna(0.0)
-            for i in order_axis:
-                c = c.reindex_axis(index, axis=i)
-            return c
 
         # concatenate data
         self.A_ff = concat_keep_order([self.A_ff, other.A_ff],
@@ -319,3 +372,8 @@ class ArdaInventory(object):
                 self.A_io_f.ix[i, fore_id] = 0.0
 
 
+def concat_keep_order(frame_list, index, axis=0, order_axis=[0]):
+    c = pd.concat(frame_list, axis).fillna(0.0)
+    for i in order_axis:
+        c = c.reindex_axis(index, axis=i)
+    return c
