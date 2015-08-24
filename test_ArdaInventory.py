@@ -36,6 +36,7 @@ class TestArdaInventory(unittest.TestCase):
 
         # WITH THREE STRESSORS
 
+        self.matdict['STR_header'] = np.array([['FULL NAME', 'MATRIXID','UNIT']])
         self.matdict['STR'] = np.array([['stress01', 1614, 'kg'],
                                         ['stress02', 1615, 'kg'],
                                         ['stress03', 1616, 'kg']], dtype=object)
@@ -72,6 +73,7 @@ class TestArdaInventory(unittest.TestCase):
         self.matdict['C'] = scipy.sparse.csc_matrix(np.ones((1,3)))
 
         self.matdict['IMP'] = np.array([['GWP100', 1,'kgCO2-eq']], dtype=object)
+        self.matdict['IMP_header'] = np.array([['FULL NAME', 'MATRIXID','UNIT']])
 
         #-----------------
 

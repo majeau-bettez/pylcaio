@@ -55,15 +55,15 @@ class ArdaInventory(object):
 
     @property
     def PRO(self):
-        return pd.concat([self.PRO_f, self.PRO_b, self.PRO_io], axis=0)
+        return pd.concat([self.PRO_f, self.PRO_b, self.PRO_io], axis=0).fillna('')
 
     @property
     def STR_all(self):
-        return pd.concat([self.STR, self.STR_io], axis=0)
+        return pd.concat([self.STR, self.STR_io], axis=0).fillna('')
 
     @property
     def IMP_all(self):
-        return pd.concat([self.IMP, self.IMP_io], axis=0)
+        return pd.concat([self.IMP, self.IMP_io], axis=0).fillna('')
 
     @property
     def A(self):
@@ -90,45 +90,45 @@ class ArdaInventory(object):
 
     def extract_labels_from_matdict(self, matdict):
 
-        try:
+        def extract_header(header):
+            the_list = header.squeeze().tolist()
+            return [x.upper() for x in the_list]
+
+        if (len(self.STR) == 0) and ('STR' in matdict):
             STR = mlt.mine_nested_array(matdict['STR'])
+            STR_header = mlt.mine_nested_array(matdict['STR_header'])
             self.STR = pd.DataFrame(
                             data=STR,
-                            index=STR[:,self._arda_default_labels].T.tolist())
-        except:
-            pass
+                            columns=extract_header(STR_header),
+                            index=STR[:, self._arda_default_labels].T.tolist()
+                            )
 
-        try:
+        if (len(self.PRO_b) == 0) and ('PRO_gen' in matdict):
             PRO_b = mlt.mine_nested_array(matdict['PRO_gen'])
+            PRO_header = mlt.mine_nested_array(matdict['PRO_header'])
             self.PRO_b = pd.DataFrame(
                     data=PRO_b,
+                    columns = extract_header(PRO_header),
                     index=PRO_b[:, self._arda_default_labels].T.tolist()
                     )
-        except:
-            pass
 
-        try:
+        if (len(self.IMP) == 0) and ('IMP' in matdict):
             IMP = mlt.mine_nested_array(matdict['IMP'])
+            IMP_header = mlt.mine_nested_array(matdict['IMP_header'])
             self.IMP = pd.DataFrame(
                     data=IMP,
+                    columns=extract_header(IMP_header),
                     index=IMP[:, self._arda_default_labels].T.tolist()
                     )
-        except:
-            pass
 
-        try:
+        if 'PRO_f' in matdict:
             PRO_f = mlt.mine_nested_array(matdict['PRO_f'])
+            PRO_header = mlt.mine_nested_array(matdict['PRO_header'])
             self.PRO_f = pd.DataFrame(
                     data = PRO_f,
-                    index = PRO_f[:,self._arda_default_labels].T.tolist()
+                    index = PRO_f[:, self._arda_default_labels].T.tolist(),
+                    columns = PRO_header.tolist()
                     )
-        except:
-            pass
-
-        try:
-            self.PRO_header = mlt.mine_nested_array(matdict['PRO_header'])
-        except:
-            pass
 
     def extract_background_from_matdict(self, matdict):
         
@@ -148,7 +148,7 @@ class ArdaInventory(object):
                                     index=self.PRO_b.index)
         except:
             pass
-        
+
     def extract_foreground_from_matdict(self, matdict):
         
         self.extract_labels_from_matdict(matdict)
@@ -170,24 +170,100 @@ class ArdaInventory(object):
         except:
             raise Warning('No final demand found')
 
-    def extract_io_background_from_pymrio(self,mrio):
+    def extract_io_background_from_pymrio(self, mrio, pro_name_cols=None,
+            str_name_cols=None):
 
-        
+        def generate_fullname(label, header, name_cols):
+            # define a "fullname" column as the first column of the process labels
+            fullname = np.empty((label.shape[0], 1), dtype='object')
+            for i in range(label.shape[0]):
+                fullname[i] = '/ '.join(label[i, name_cols])
+            label = np.hstack((fullname, label))
+            header = ['FULL NAME'] + header
+            return label, header
+
+        def reconcile_ids(io_label, arda_label, header):
+            a = np.max(arda_label.ix[:,self._ardaId_column])
+            order_magnitude = int(np.math.floor(np.math.log10(abs(a))))
+            min_id = np.around(a, -order_magnitude) + 10**order_magnitude + 1
+            new_ids = np.array(
+                    [i for i in range(min_id, min_id  + io_label.shape[0])]
+                    ).reshape((io_label.shape[0], 1))
+
+            new_iolabels = np.hstack((io_label[:, :self._ardaId_column],
+                                      new_ids,
+                                      io_label[:, self._ardaId_column:]))
+            new_header = (header[: self._ardaId_column]
+                                 + ['MATRIXID']
+                                 + header[self._ardaId_column:])
+
+            return new_iolabels, new_header
+
+
         self.A_io = mrio.A.copy()
 
 
-        if (isinstance(mrio.emissions.S.index, pd.core.index.MultiIndex) and not
+        # get "process labels", add units as last column
+        PRO_io = np.hstack((
+                    np.array([list(r) for r in self.A_io.index]),
+                    mrio.unit.values))
+        PRO_header = [x.upper() for x in mrio.A.index.names]
+        PRO_header = PRO_header + ['UNIT']
+
+        # define a "fullname" column as the first column of the process labels
+        if pro_name_cols is not None:
+            PRO_io, PRO_header = generate_fullname(PRO_io,
+                                                   PRO_header,
+                                                   pro_name_cols)
+#            fullname = np.empty((PRO_io.shape[0], 1), dtype='object')
+#            for i in range(PRO_io.shape[0]):
+#                fullname[i] = '/ '.join(PRO_io[i, pro_name_cols])
+#            PRO_io = np.hstack((fullname, PRO_io))
+#            PRO_header = ['FULL NAME'] + PRO_header
+
+        # define some numeric ID for each process, put in second column
+        PRO_io, PRO_header= reconcile_ids(PRO_io, self.PRO, PRO_header)
+
+        self.PRO_io = pd.DataFrame(PRO_io,
+                                   #index=PRO_io[:,self._arda_default_labels].T.tolist(),
+                                   index=self.A_io.index,
+                                   columns = PRO_header)
+
+        if (isinstance(mrio.emissions.S.index, pd.core.index.MultiIndex)
+            and not
             isinstance(mrio.factor_inputs.S.index, pd.core.index.MultiIndex)):
-                twice = np.array([mrio.factor_inputs.S.index.values,mrio.factor_inputs.S.index.values ])
+                twice = np.array([mrio.factor_inputs.S.index.values,
+                                  mrio.factor_inputs.S.index.values ])
                 mrio.factor_inputs.S.index = pd.MultiIndex.from_arrays(twice)
 
         self.F_io = pd.concat([mrio.emissions.S, mrio.factor_inputs.S])
 
-        PRO_io = np.array([list(r) for r in self.A_io.index])
-        self.PRO_io = pd.DataFrame(PRO_io, index=PRO_io.T.tolist())
+        # get STR labels and units (as last column)
+        units_str = pd.concat([mrio.emissions.unit, mrio.factor_inputs.unit]
+                              ).values
+        STR_io = np.hstack((np.array([list(r) for r in self.F_io.index]),
+                            units_str))
 
-        STR_io = np.array([list(r) for r in self.F_io.index])
-        self.STR_io = pd.DataFrame(STR_io, index=STR_io.T.tolist())
+        # get STR header
+        STR_header = [x.upper() for x in self.F_io.index.names]
+        STR_header = STR_header + ['UNIT']
+
+
+        # define a fullname for each stressor
+        if str_name_cols is not None:
+            STR_io, STR_header = generate_fullname(STR_io,
+                                                   STR_header,
+                                                   str_name_cols)
+
+        # define some numeric ID for each stressor, put in second column
+        STR_io, STR_header= reconcile_ids(STR_io, self.STR, STR_header)
+
+        self.STR_io = pd.DataFrame(
+                STR_io,
+                #index=STR_io[:, self._arda_default_labels].T.tolist(),
+                index=self.F_io.index,
+                columns=STR_header
+                )
 
         self.A_io_f = pd.DataFrame(index=self.A_io.index,
                                    columns=self.A_ff.columns).fillna(0.0)
@@ -196,8 +272,8 @@ class ArdaInventory(object):
                                    columns=self.A_ff.columns).fillna(0.0)
 
         self.IMP_io = self.STR_io.copy()
-        self.C_io = pd.DataFrame(index=self.STR_io.index,
-                                 columns=self.STR_io.index,
+        self.C_io = pd.DataFrame(index=self.F_io.index,
+                                 columns=self.F_io.index,
                                  data=np.eye(self.STR_io.index.values.shape[0]))
 
 
