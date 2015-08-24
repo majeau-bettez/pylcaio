@@ -111,7 +111,6 @@ class TestArdaInventory(unittest.TestCase):
 
 
     def test_append_to_foreground(self):
-        print('test_append')
         a = ArdaInventory.ArdaInventory(1)
         b = ArdaInventory.ArdaInventory(1)
         a.extract_background_from_matdict(self.matdict)
@@ -191,7 +190,6 @@ class TestArdaInventory(unittest.TestCase):
     def test_match_foreground_background(self):
         a = ArdaInventory.ArdaInventory()
         a.extract_foreground_from_matdict(self.matdict)
-        print("ABOUT TO READ IN BIGDICT")
         a.extract_background_from_matdict(self.bigdict)
         a.match_foreground_to_background()
         assert(np.all(a.A_bf.values == np.array([[0, 1],

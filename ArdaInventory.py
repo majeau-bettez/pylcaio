@@ -359,9 +359,8 @@ class ArdaInventory(object):
 
     def append_to_foreground(self, other, final_demand=False):
 
-
         # check if no duplicate index in dataframes
-        if len(self.A_ff.index - other.A_ff.index) < len(self.A_ff.index):
+        if len(self.A_ff.index.intersection(other.A_ff.index)) > 0:
             raise ValueError("The two inventories share common foreground"
                              " labels. I will not combine them.")
 
