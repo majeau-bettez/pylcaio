@@ -165,6 +165,7 @@ class TestArdaInventory(unittest.TestCase):
         mrio = pymrio.load_test()
         mrio.calc_all()
         a = ArdaInventory.ArdaInventory()
+        a.extract_background_from_matdict(self.matdict)
         a.extract_io_background_from_pymrio(mrio)
 
         # assertion1
@@ -190,6 +191,7 @@ class TestArdaInventory(unittest.TestCase):
     def test_match_foreground_background(self):
         a = ArdaInventory.ArdaInventory()
         a.extract_foreground_from_matdict(self.matdict)
+        print("ABOUT TO READ IN BIGDICT")
         a.extract_background_from_matdict(self.bigdict)
         a.match_foreground_to_background()
         assert(np.all(a.A_bf.values == np.array([[0, 1],

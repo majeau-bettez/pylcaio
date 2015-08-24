@@ -24,9 +24,6 @@ class ArdaInventory(object):
         self.STR_io = pd.DataFrame()
         self.IMP_io = pd.DataFrame()
 
-        # label column headers
-        self.PRO_header = np.array([])
-
         # Main matrices, as Pandas Dataframes ()
         self.A_ff = pd.DataFrame()
         self.A_bf = pd.DataFrame()
@@ -94,16 +91,20 @@ class ArdaInventory(object):
             the_list = header.squeeze().tolist()
             return [x.upper() for x in the_list]
 
-        if (len(self.STR) == 0) and ('STR' in matdict):
+        if 'STR' in matdict:
             STR = mlt.mine_nested_array(matdict['STR'])
-            STR_header = mlt.mine_nested_array(matdict['STR_header'])
             self.STR = pd.DataFrame(
                             data=STR,
-                            columns=extract_header(STR_header),
                             index=STR[:, self._arda_default_labels].T.tolist()
                             )
+            try:
+                STR_header = mlt.mine_nested_array(matdict['STR_header'])
+                self.STR.columns = extract_header(STR_header)
+            except:
+                pass
 
-        if (len(self.PRO_b) == 0) and ('PRO_gen' in matdict):
+
+        if 'PRO_gen' in matdict:
             PRO_b = mlt.mine_nested_array(matdict['PRO_gen'])
             PRO_header = mlt.mine_nested_array(matdict['PRO_header'])
             self.PRO_b = pd.DataFrame(
@@ -112,7 +113,7 @@ class ArdaInventory(object):
                     index=PRO_b[:, self._arda_default_labels].T.tolist()
                     )
 
-        if (len(self.IMP) == 0) and ('IMP' in matdict):
+        if 'IMP' in matdict:
             IMP = mlt.mine_nested_array(matdict['IMP'])
             IMP_header = mlt.mine_nested_array(matdict['IMP_header'])
             self.IMP = pd.DataFrame(
@@ -131,9 +132,9 @@ class ArdaInventory(object):
                     )
 
     def extract_background_from_matdict(self, matdict):
-        
+
         self.extract_labels_from_matdict(matdict)
-        
+
         self.F_b = pd.DataFrame(data=matdict['F_gen'].toarray(),
                                 index=self.STR.index,
                                 columns=self.PRO_b.index)
@@ -183,7 +184,7 @@ class ArdaInventory(object):
             return label, header
 
         def reconcile_ids(io_label, arda_label, header):
-            a = np.max(arda_label.ix[:,self._ardaId_column])
+            a = np.max(arda_label.iloc[:,self._ardaId_column])
             order_magnitude = int(np.math.floor(np.math.log10(abs(a))))
             min_id = np.around(a, -order_magnitude) + 10**order_magnitude + 1
             new_ids = np.array(
@@ -194,7 +195,7 @@ class ArdaInventory(object):
                                       new_ids,
                                       io_label[:, self._ardaId_column:]))
             new_header = (header[: self._ardaId_column]
-                                 + ['MATRIXID']
+                                 + [arda_label.columns[self._ardaId_column]]
                                  + header[self._ardaId_column:])
 
             return new_iolabels, new_header
@@ -302,13 +303,11 @@ class ArdaInventory(object):
                     'y_f': scipy.sparse.csc_matrix(self.y_f.values),
                     'PRO_f': self.PRO_f.values,
                     'PRO_gen': self.PRO_b.values,
-                    'STR': self.STR.values
+                    'STR': self.STR.values,
+                    'PRO_header': self.PRO_f.columns,
+                    'STR_header': self.STR.columns,
+                    'IMP_header': self.IMP.columns
                    }
-
-        try:
-            matdict['PRO_header'] = self.PRO_header
-        except:
-            pass
 
         return matdict
 
@@ -322,7 +321,10 @@ class ArdaInventory(object):
                         'y_gen': self.y.values,
                         'PRO_gen': self.PRO.values,
                         'STR': self.STR_all.values,
-                        'IMP': self.IMP_all.values
+                        'IMP': self.IMP_all.values,
+                        'PRO_header': self.PRO_f.columns,
+                        'STR_header': self.STR.columns,
+                        'IMP_header': self.IMP.columns
                         }
         else:
 
@@ -334,13 +336,15 @@ class ArdaInventory(object):
                         'y_gen': scipy.sparse.csc_matrix(self.y_f.values),
                         'PRO_gen': self.PRO_b.values,
                         'STR': self.STR.values,
-                        'IMP': self.IMP.values
+                        'IMP': self.IMP.values,
+                        'PRO_header': self.PRO_f.columns,
+                        'STR_header': self.STR.columns,
+                        'IMP_header': self.IMP.columns
                        }
             matdict.update(matdict_fore)
 
         return matdict
         
-    
     def delete_processes_foreground(self, id_begone=[]):
 
             #bo_begone = np.zeros(self.PRO_f.shape[0], dtype=bool)
@@ -375,8 +379,7 @@ class ArdaInventory(object):
         # uint16, etc.)
         the_type = type(other.PRO_f.iloc[0, self._ardaId_column])
         self.PRO_f = pd.concat([self.PRO_f, other.PRO_f], axis=0)
-        self.PRO_f[self._ardaId_column] = self.PRO_f[self._ardaId_column].astype(the_type)
-
+        self.PRO_f.iloc[:,self._ardaId_column] = self.PRO_f.iloc[:,self._ardaId_column].astype(the_type)
 
 
         # concatenate data
