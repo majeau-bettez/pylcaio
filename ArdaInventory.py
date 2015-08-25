@@ -65,18 +65,18 @@ class ArdaInventory(object):
     @property
     def A(self):
         return pd.concat([
-                 self.A_ff,
-                 pd.concat([self.A_bf, self.A_bb], axis=1),
-                 pd.concat([self.A_io_f, self.A_io], axis=1)], axis=0)
+                 i2s(self.A_ff),
+                 pd.concat([i2s(self.A_bf), i2s(self.A_bb)], axis=1),
+                 pd.concat([i2s(self.A_io_f), i2s(self.A_io)], axis=1)], axis=0)
     @property
     def F(self):
         return pd.concat(
-                [pd.concat([self.F_f, self.F_b], axis=1),
-                 pd.concat([self.F_io_f, self.F_io], axis=1)], axis=0)
+                [pd.concat([i2s(self.F_f), i2s(self.F_b)], axis=1),
+                 pd.concat([i2s(self.F_io_f), i2s(self.F_io)], axis=1)], axis=0)
     @property
     def C_all(self):
-        return concat_keep_order([self.C, self.C_io],
-                                 self.STR.index,
+        return concat_keep_order([i2s(self.C), i2s(self.C_io)],
+                                 i2s(self.STR_all).index,
                                  order_axis=[1])
 
     @property
@@ -131,7 +131,7 @@ class ArdaInventory(object):
                     columns = PRO_header.tolist()
                     )
 
-    def extract_background_from_matdict(self, matdict, overrule=False):
+    def extract_background_from_matdict(self, matdict, overrule=True):
 
         self.extract_labels_from_matdict(matdict, overrule)
 
@@ -150,18 +150,17 @@ class ArdaInventory(object):
         except:
             pass
 
-    def extract_foreground_from_matdict(self, matdict, overrule=False):
-        
+    def extract_foreground_from_matdict(self, matdict, overrule=True):
+
         self.extract_labels_from_matdict(matdict, overrule)
-        
-        IPython.embed()
+
         self.A_ff = pd.DataFrame(data=matdict['A_ff'].toarray(),
                                  index=self.PRO_f.index,
                                  columns=self.PRO_f.index)
         self.A_bf = pd.DataFrame(data=matdict['A_bf'].toarray(),
                                  index=self.PRO_b.index,
                                  columns=self.PRO_f.index)
-        
+
         self.F_f = pd.DataFrame(data=matdict['F_f'].toarray(),
                                 index=self.STR.index,
                                 columns=self.PRO_f.index)
@@ -456,3 +455,8 @@ def concat_keep_order(frame_list, index, axis=0, order_axis=[0]):
     for i in order_axis:
         c = c.reindex_axis(index, axis=i)
     return c
+
+def i2s(a):
+    a.index = a.index.to_series()
+    a.columns = a.columns.to_series()
+    return a

@@ -25,7 +25,7 @@ class TestArdaInventory(unittest.TestCase):
 
         # A 2X2 FOREGROUND
 
-        self.matdict['PRO_f'] = np.array([['s+orm', 10001, 'kg'],
+        self.matdict['PRO_f'] = np.array([['s+orm', 10005, 'kg'],
                                           ['Batt Packing', 10002, 'kg']],
                                           dtype=object)
 
@@ -117,8 +117,7 @@ class TestArdaInventory(unittest.TestCase):
         a.extract_foreground_from_matdict(self.matdict)
 
         B = {}
-        B['PRO_f'] = np.array([ ['foo', 10, 'kg']],
-                                          dtype=object)
+        B['PRO_f'] = np.array([['foo', 10, 'kg']], dtype=object)
 
         B['A_bf'] = scipy.sparse.csc_matrix([[1.0],
                                              [0.0],
@@ -146,7 +145,7 @@ class TestArdaInventory(unittest.TestCase):
 
         a.append_to_foreground(b)
 
-        y_f = pd.DataFrame({0: {10001: 1.0, 10002: 0.0, 10: 0.0}})
+        y_f = pd.DataFrame({0: {10005: 1.0, 10002: 0.0, 10: 0.0}})
         assert_frames_equivalent(a.y_f, y_f)
 
 
@@ -210,7 +209,7 @@ class TestArdaInventory(unittest.TestCase):
     def test_delete_processes_foreground(self):
         a = ArdaInventory.ArdaInventory(1)
         a.extract_foreground_from_matdict(self.matdict)
-        a.delete_processes_foreground([10001])
+        a.delete_processes_foreground([10005])
 
         # A 2X2 FOREGROUND
 
@@ -295,25 +294,25 @@ class TestArdaInventory(unittest.TestCase):
         a.append_to_foreground(b, final_demand=True)
 
 
-        A_ff = pd.DataFrame({10001: {10001: 0.0, 10002: 10.0, 10: 0.0},
-                             10: {10001: 0.0, 10002: 0.0, 10: 11.0},
-                             10002: {10001: 1.0, 10002: 11.0, 10: 0.0}})
+        A_ff = pd.DataFrame({10005: {10005: 0.0, 10002: 10.0, 10: 0.0},
+                             10: {10005: 0.0, 10002: 0.0, 10: 11.0},
+                             10002: {10005: 1.0, 10002: 11.0, 10: 0.0}})
         assert_frames_equivalent(a.A_ff, A_ff)
 
-        A_bf = pd.DataFrame({10001: {1: 0.0, 2: 1.0, 3: 1.0, 4: 0.0},
+        A_bf = pd.DataFrame({10005: {1: 0.0, 2: 1.0, 3: 1.0, 4: 0.0},
                              10002: {1: 1.0, 2: 0.0, 3: 0.0, 4: 0.0},
                              10:    {1: 1.0, 2: 0.0, 3: 0.0, 4: 0.0}})
 
         assert_frames_equivalent(a.A_bf, A_bf)
 
         F_f = pd.DataFrame(
-                {10001: {1616: 0.0, 1614: 0.29999999999999999, 1615: 0.10000000000000001},
+                {10005: {1616: 0.0, 1614: 0.29999999999999999, 1615: 0.10000000000000001},
                  10002: {1616: 0.0, 1614: 0.0, 1615: 0.20000000000000001},
                  10: {1616: 0.0, 1614: 0.0, 1615: 0.20000000000000001}})
 
         assert_frames_equivalent(a.F_f, F_f)
 
-        y_f = pd.DataFrame({0: {10001: 1.0, 10002: 0.0, 10: 2.0}})
+        y_f = pd.DataFrame({0: {10005: 1.0, 10002: 0.0, 10: 2.0}})
 
         assert_frames_equivalent(a.y_f, y_f)
 
@@ -380,7 +379,7 @@ class TestArdaInventory(unittest.TestCase):
                                                   ('back03', 3, 'MJ'): 0.0,
                                                   ('back04', 4, 'MJ'): 0.0,
                                                   ('back02', 2, 'kg'): 0.0},
-                              ('s+orm', 10001, 'kg'): {
+                              ('s+orm', 10005, 'kg'): {
                                                   ('back01', 1, 'kg'): 0.0,
                                                   ('back03', 3, 'MJ'): 1.0,
                                                   ('back04', 4, 'MJ'): 0.0,
@@ -395,14 +394,44 @@ class TestArdaInventory(unittest.TestCase):
 
         a.increase_foreground_process_ids(70000)
 
-        A_ff = pd.DataFrame({80001: {80001: 0, 80002: 10},
-                             80002: {80001: 1, 80002: 11}})
+        A_ff = pd.DataFrame({80005: {80005: 0, 80002: 10},
+                             80002: {80005: 1, 80002: 11}})
         assert_frames_equivalent(a.A_ff, A_ff)
 
 
-        PRO_f =  np.array([['s+orm', 80001, 'kg'],
+        PRO_f =  np.array([['s+orm', 80005, 'kg'],
                            ['Batt Packing', 80002, 'kg']], dtype=object)
         assert(np.all(a.PRO_f == PRO_f))
+
+
+    def test_properties_singleindex(self):
+        mrio = pymrio.load_test()
+        mrio.calc_all()
+        a = ArdaInventory.ArdaInventory([1])
+        a.extract_background_from_matdict(self.matdict)
+        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_io_background_from_pymrio(mrio)
+
+        a.A
+        a.F
+        a.PRO
+        a.STR_all
+        a.C_all
+
+    def test_properties_multiindex(self):
+        mrio = pymrio.load_test()
+        mrio.calc_all()
+        a = ArdaInventory.ArdaInventory([0,1])
+        a.extract_background_from_matdict(self.matdict)
+        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_io_background_from_pymrio(mrio)
+
+        a.A
+        a.F
+        a.PRO
+        a.STR_all
+        a.C_all
+        IPython.embed()
 
 #=========================================================
 def assert_frames_equivalent(df1, df2, **kwds):
