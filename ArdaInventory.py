@@ -52,15 +52,18 @@ class ArdaInventory(object):
 
     @property
     def PRO(self):
-        return pd.concat([self.PRO_f, self.PRO_b, self.PRO_io], axis=0).fillna('')
+        pro =  pd.concat([self.PRO_f, self.PRO_b, self.PRO_io], axis=0)
+        return reorder_cols(pro.fillna(''))
 
     @property
     def STR_all(self):
-        return pd.concat([self.STR, self.STR_io], axis=0).fillna('')
+        str_all = pd.concat([self.STR, self.STR_io], axis=0)
+        return reorder_cols(str_all.fillna(''))
 
     @property
     def IMP_all(self):
-        return pd.concat([self.IMP, self.IMP_io], axis=0).fillna('')
+        imp = pd.concat([self.IMP, self.IMP_io], axis=0)
+        return reorder_cols(imp.fillna(''))
 
     @property
     def A(self):
@@ -86,10 +89,6 @@ class ArdaInventory(object):
 
 
     def extract_labels_from_matdict(self, matdict, overrule):
-
-        def extract_header(header):
-            the_list = header.squeeze().tolist()
-            return [x.upper() for x in the_list]
 
         if  (overrule or len(self.STR) == 0) and 'STR' in matdict:
             STR = mlt.mine_nested_array(matdict['STR'])
@@ -128,7 +127,7 @@ class ArdaInventory(object):
             self.PRO_f = pd.DataFrame(
                     data = PRO_f,
                     index = PRO_f[:, self._arda_default_labels].T.tolist(),
-                    columns = PRO_header.tolist()
+                    columns = extract_header(PRO_header)
                     )
 
     def extract_background_from_matdict(self, matdict, overrule=True):
@@ -180,7 +179,7 @@ class ArdaInventory(object):
             for i in range(label.shape[0]):
                 fullname[i] = '/ '.join(label[i, name_cols])
             label = np.hstack((fullname, label))
-            header = ['FULL NAME'] + header
+            header = ['FULLNAME'] + header
             return label, header
 
         def reconcile_ids(io_label, arda_label, header):
@@ -455,6 +454,19 @@ def concat_keep_order(frame_list, index, axis=0, order_axis=[0]):
     for i in order_axis:
         c = c.reindex_axis(index, axis=i)
     return c
+
+def extract_header(header):
+    the_list = header.squeeze().tolist()
+    the_list = [x.upper() for x in the_list]
+    the_list = [x.replace('ARDAID','MATRIXID') for x in the_list]
+    the_list = [x.replace('FULL NAME','FULLNAME') for x in the_list]
+    the_list = [x.replace('COMPARTMENT','COMP') for x in the_list]
+    return the_list
+
+def reorder_cols(a):
+    cols = a.columns - ['FULLNAME', 'MATRIXID','UNIT']
+    sorted_cols = ['FULLNAME','MATRIXID'] + cols.tolist() + ['UNIT']
+    return a.reindex_axis(sorted_cols, 1)
 
 def i2s(a):
     a.index = a.index.to_series()

@@ -403,7 +403,6 @@ class TestArdaInventory(unittest.TestCase):
                            ['Batt Packing', 80002, 'kg']], dtype=object)
         assert(np.all(a.PRO_f == PRO_f))
 
-
     def test_properties_singleindex(self):
         mrio = pymrio.load_test()
         mrio.calc_all()
@@ -431,7 +430,6 @@ class TestArdaInventory(unittest.TestCase):
         a.PRO
         a.STR_all
         a.C_all
-        IPython.embed()
 
 #=========================================================
 def assert_frames_equivalent(df1, df2, **kwds):
