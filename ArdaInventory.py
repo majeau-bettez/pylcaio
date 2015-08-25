@@ -85,13 +85,13 @@ class ArdaInventory(object):
         return y_pro.reindex_axis(self.PRO.index, axis=0).fillna(0.0)
 
 
-    def extract_labels_from_matdict(self, matdict):
+    def extract_labels_from_matdict(self, matdict, overrule):
 
         def extract_header(header):
             the_list = header.squeeze().tolist()
             return [x.upper() for x in the_list]
 
-        if 'STR' in matdict:
+        if  (overrule or len(self.STR) == 0) and 'STR' in matdict:
             STR = mlt.mine_nested_array(matdict['STR'])
             self.STR = pd.DataFrame(
                             data=STR,
@@ -104,7 +104,7 @@ class ArdaInventory(object):
                 pass
 
 
-        if 'PRO_gen' in matdict:
+        if  (overrule or len(self.PRO_b) == 0) and 'PRO_gen' in matdict:
             PRO_b = mlt.mine_nested_array(matdict['PRO_gen'])
             PRO_header = mlt.mine_nested_array(matdict['PRO_header'])
             self.PRO_b = pd.DataFrame(
@@ -113,7 +113,7 @@ class ArdaInventory(object):
                     index=PRO_b[:, self._arda_default_labels].T.tolist()
                     )
 
-        if 'IMP' in matdict:
+        if  (overrule or len(self.IMP) == 0) and 'IMP' in matdict:
             IMP = mlt.mine_nested_array(matdict['IMP'])
             IMP_header = mlt.mine_nested_array(matdict['IMP_header'])
             self.IMP = pd.DataFrame(
@@ -122,7 +122,7 @@ class ArdaInventory(object):
                     index=IMP[:, self._arda_default_labels].T.tolist()
                     )
 
-        if 'PRO_f' in matdict:
+        if  (overrule or len(self.PRO_f) == 0) and 'PRO_f' in matdict:
             PRO_f = mlt.mine_nested_array(matdict['PRO_f'])
             PRO_header = mlt.mine_nested_array(matdict['PRO_header'])
             self.PRO_f = pd.DataFrame(
@@ -131,9 +131,9 @@ class ArdaInventory(object):
                     columns = PRO_header.tolist()
                     )
 
-    def extract_background_from_matdict(self, matdict):
+    def extract_background_from_matdict(self, matdict, overrule=False):
 
-        self.extract_labels_from_matdict(matdict)
+        self.extract_labels_from_matdict(matdict, overrule)
 
         self.F_b = pd.DataFrame(data=matdict['F_gen'].toarray(),
                                 index=self.STR.index,
@@ -150,10 +150,11 @@ class ArdaInventory(object):
         except:
             pass
 
-    def extract_foreground_from_matdict(self, matdict):
+    def extract_foreground_from_matdict(self, matdict, overrule=False):
         
-        self.extract_labels_from_matdict(matdict)
+        self.extract_labels_from_matdict(matdict, overrule)
         
+        IPython.embed()
         self.A_ff = pd.DataFrame(data=matdict['A_ff'].toarray(),
                                  index=self.PRO_f.index,
                                  columns=self.PRO_f.index)
