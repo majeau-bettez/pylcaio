@@ -404,6 +404,23 @@ class TestArdaInventory(unittest.TestCase):
                            ['Batt Packing', 80002, 'kg']], dtype=object)
         assert(np.all(a.PRO_f == PRO_f))
 
+    def test_properties(self):
+
+        mrio = pymrio.load_test()
+        mrio.calc_all()
+        a = ArdaInventory.ArdaInventory([0,1,-1])
+        a.extract_background_from_matdict(self.matdict)
+        a.extract_io_background_from_pymrio(mrio)
+        IPython.embed()
+
+        a.PRO
+        a.A
+        a.STR_all
+        a.F
+        a.IMP_all
+        a.C_all
+
+
 #=========================================================
 def assert_frames_equivalent(df1, df2, **kwds):
     pdt.assert_frame_equal(df1.sort_index().sort(axis=1),
