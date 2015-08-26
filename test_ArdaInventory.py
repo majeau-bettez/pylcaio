@@ -153,10 +153,14 @@ class TestArdaInventory(unittest.TestCase):
 
         a = ArdaInventory.ArdaInventory()
         a.extract_background_from_matdict(self.matdict)
+        a.to_matfile('/tmp/test_background.mat', foreground=False, background=True)
         a.extract_foreground_from_matdict(self.matdict)
-        matdict = a.export_system_to_matdict(False)
+        a.to_matfile('/tmp/test_foreground.mat', foreground=True, background=False)
 
-        assert(matdict.keys() == self.matdict.keys())
+        fore = sio.loadmat( '/tmp/test_foreground.mat')
+        back = sio.loadmat( '/tmp/test_background.mat')
+
+        assert(len(self.matdict.keys() - fore.keys() - back.keys())==0)
 
     def test_extract_io_background_from_pymrio(self):
 

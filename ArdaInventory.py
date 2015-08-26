@@ -67,15 +67,20 @@ class ArdaInventory(object):
 
     @property
     def A(self):
-        return pd.concat([
-                 i2s(self.A_ff),
+        a = pd.concat([     i2s(self.A_ff),
                  pd.concat([i2s(self.A_bf), i2s(self.A_bb)], axis=1),
-                 pd.concat([i2s(self.A_io_f), i2s(self.A_io)], axis=1)], axis=0)
+                 pd.concat([i2s(self.A_io_f), i2s(self.A_io)], axis=1)], axis=0
+                 )
+        return a.reindex_axis(self.PRO.index, 0).reindex_axis(self.PRO.index,1
+                                                              ).fillna(0.0)
     @property
     def F(self):
-        return pd.concat(
-                [pd.concat([i2s(self.F_f), i2s(self.F_b)], axis=1),
-                 pd.concat([i2s(self.F_io_f), i2s(self.F_io)], axis=1)], axis=0)
+        f= pd.concat([pd.concat([i2s(self.F_f), i2s(self.F_b)], axis=1),
+                      pd.concat([i2s(self.F_io_f), i2s(self.F_io)], axis=1)],
+                     axis=0)
+        return f.reindex_axis(self.STR_all.index, 0).reindex_axis(self.PRO.index,1
+                ).fillna(0.0)
+
     @property
     def C_all(self):
         return concat_keep_order([i2s(self.C), i2s(self.C_io)],
@@ -294,56 +299,52 @@ class ArdaInventory(object):
         else:
             self.A_bf = A_bf_new
             
-    def export_foreground_to_matdict(self):
-        matdict = {
-                    'A_ff': scipy.sparse.csc_matrix(self.A_ff.values),
-                    'A_bf': scipy.sparse.csc_matrix(self.A_bf.values),
-                    'F_f': scipy.sparse.csc_matrix(self.F_f.values),
-                    'y_f': scipy.sparse.csc_matrix(self.y_f.values),
-                    'PRO_f': self.PRO_f.values,
+    def to_matfile(self, filename, foreground=True, background=True):
+
+        csc = scipy.sparse.csc_matrix
+
+        if foreground and not background:
+            sio.savemat(filename, {
+                    'A_ff':         scipy.sparse.csc_matrix(self.A_ff.values),
+                    'A_bf':         scipy.sparse.csc_matrix(self.A_bf.values),
+                    'F_f':          scipy.sparse.csc_matrix(self.F_f.values),
+                    'y_f':          scipy.sparse.csc_matrix(self.y_f.values),
+                    'PRO_f':        self.PRO_f.values,
+                    'PRO_gen':      self.PRO_b.values,
+                    'STR':          self.STR.values,
+                    'PRO_header':   np.atleast_2d(self.PRO_f.columns.values),
+                    'STR_header':   np.atleast_2d(self.STR.columns.values),
+                    'IMP_header':   np.atleast_2d(self.IMP.columns.values)
+                   })
+        elif background and not foreground:
+            print('Not tested')
+            sio.savemat(filename, {
+                    'A_gen': scipy.sparse.csc_matrix(self.A_bb.values),
+                    'F_gen': scipy.sparse.csc_matrix(self.F_b.values),
+                    'C': scipy.sparse.csc_matrix(self.C.values),
+                    'y_gen': scipy.sparse.csc_matrix(self.y_b.values),
                     'PRO_gen': self.PRO_b.values,
                     'STR': self.STR.values,
-                    'PRO_header': self.PRO_f.columns,
-                    'STR_header': self.STR.columns,
-                    'IMP_header': self.IMP.columns
-                   }
+                    'IMP': self.IMP.values,
+                    'PRO_header': np.atleast_2d(self.PRO_b.columns.values),
+                    'STR_header': np.atleast_2d(self.STR.columns.values),
+                    'IMP_header': np.atleast_2d(self.IMP.columns.values)
+                       })
 
-        return matdict
-
-    def export_system_to_matdict(self, consolidated=True):
-
-        if consolidated:
-            matdict = {
-                        'A_gen': self.A.values,
-                        'F_gen': self.F.values,
-                        'C': self.C_all.values,
-                        'y_gen': self.y.values,
-                        'PRO_gen': self.PRO.values,
-                        'STR': self.STR_all.values,
-                        'IMP': self.IMP_all.values,
-                        'PRO_header': self.PRO_f.columns,
-                        'STR_header': self.STR.columns,
-                        'IMP_header': self.IMP.columns
-                        }
         else:
+            sio.savemat(filename, {
+                    'A_gen':      csc(self.A.values),
+                    'F_gen':      csc(self.F.values),
+                    'C':          csc(self.C_all.values),
+                    'y_gen':      csc(self.y.values),
+                    'PRO_gen':    self.PRO.values,
+                    'STR':        self.STR_all.values,
+                    'IMP':        self.IMP_all.values,
+                    'PRO_header': np.atleast_2d(self.PRO.columns.values),
+                    'STR_header': np.atleast_2d(self.STR_all.columns.values),
+                    'IMP_header': np.atleast_2d(self.IMP_all.columns.values)
+                    })
 
-            matdict_fore = self.export_foreground_to_matdict()
-            matdict = {
-                        'A_gen': scipy.sparse.csc_matrix(self.A_bb.values),
-                        'F_gen': scipy.sparse.csc_matrix(self.F_f.values),
-                        'C': scipy.sparse.csc_matrix(self.C.values),
-                        'y_gen': scipy.sparse.csc_matrix(self.y_f.values),
-                        'PRO_gen': self.PRO_b.values,
-                        'STR': self.STR.values,
-                        'IMP': self.IMP.values,
-                        'PRO_header': self.PRO_f.columns,
-                        'STR_header': self.STR.columns,
-                        'IMP_header': self.IMP.columns
-                       }
-            matdict.update(matdict_fore)
-
-        return matdict
-        
     def delete_processes_foreground(self, id_begone=[]):
 
             #bo_begone = np.zeros(self.PRO_f.shape[0], dtype=bool)
