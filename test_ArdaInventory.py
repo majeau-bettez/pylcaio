@@ -435,6 +435,29 @@ class TestArdaInventory(unittest.TestCase):
         a.STR_all
         a.C_all
 
+    def test_hybridization(self):
+
+        mrio = pymrio.load_test()
+        mrio.calc_all()
+        a = ArdaInventory.ArdaInventory([0,1])
+        a.extract_background_from_matdict(self.matdict)
+        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_io_background_from_pymrio(mrio)
+        a.io_material_sectors=['mining', 'food']
+        a.hybridize_process(('Batt Packing', 10002), 'reg2', 'transport', 0.1)
+
+        # assert that it got copied properly
+        self.assertEqual(
+                a.A.ix[('reg2', 'manufactoring'),('Batt Packing', 10002)],
+                a.A.ix[('reg2','manufactoring'),('reg2','transport')]/10)
+
+        # assert that double counting got corrected properly
+        self.assertEqual(a.A.ix[('reg1', 'food'),('Batt Packing', 10002)], 0)
+
+        # assert that direct emissions did not get copied
+        self.assertEqual(a.F.ix[('emission_type1', 'air'),('Batt Packing',
+            10002)], 0)
+
 #=========================================================
 def assert_frames_equivalent(df1, df2, **kwds):
     pdt.assert_frame_equal(df1.sort_index().sort(axis=1),
