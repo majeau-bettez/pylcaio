@@ -51,9 +51,9 @@ class TestArdaInventory(unittest.TestCase):
         # FOUR BACKGROUND PROCESSES
 
         self.matdict['A_gen'] = scipy.sparse.csc_matrix([[0, 1, 0, 0],
-                                                   [0, 0, 2, 0],
-                                                   [1, 0, 1, 0],
-                                                   [0, 3, 0, 0]])
+                                                         [0, 0, 2, 0],
+                                                         [1, 0, 1, 0],
+                                                         [0, 3, 0, 0]])
 
         self.matdict['PRO_gen'] = np.array([['back01', 1, 'kg'],
                                             ['back02', 2, 'kg'],
@@ -451,12 +451,45 @@ class TestArdaInventory(unittest.TestCase):
                 a.A.ix[('reg2', 'manufactoring'),('Batt Packing', 10002)],
                 a.A.ix[('reg2','manufactoring'),('reg2','transport')]/10)
 
-        # assert that double counting got corrected properly
+        # assert that double counting form materioal inputs got corrected properly
         self.assertEqual(a.A.ix[('reg1', 'food'),('Batt Packing', 10002)], 0)
+
+        # assert that intrasector flows were removed
+        self.assertEqual(a.A.ix[('reg1', 'transport'), ('Batt Packing', 10002)],
+                         0)
 
         # assert that direct emissions did not get copied
         self.assertEqual(a.F.ix[('emission_type1', 'air'),('Batt Packing',
             10002)], 0)
+
+    def test_calc_lifecycle(self):
+
+        a = ArdaInventory.ArdaInventory([0,1])
+        a.extract_background_from_matdict(self.matdict)
+        a.extract_foreground_from_matdict(self.matdict)
+        x = a.calc_lifecycle('production')
+        x0 = pd.DataFrame.from_dict(
+                {0: {('back03', 3): -0.25,
+                     ('back02', 2): -0.0,
+                     ('back04', 4): -0.0,
+                     ('back01', 1): -0.5,
+                     ('s+orm', 10005): 0.5,
+                     ('Batt Packing', 10002): -0.5}})
+
+        assert_frames_equivalent(x, x0)
+
+        e = a.calc_lifecycle('emissions')
+        e0 = pd.DataFrame.from_dict(
+                {0: {('stress02', 1615): -0.050000000000000003,
+                     ('stress01', 1614): 0.14999999999999999,
+                     ('stress03', 1616): 0.0}})
+        assert_frames_equivalent(e, e0)
+
+
+        d = a.calc_lifecycle('impacts')
+        d0 = ArdaInventory.i2s(pd.DataFrame.from_dict(
+                {0: {('GWP100', 1): 0.099999999999999992}}))
+        assert_frames_equivalent(d, d0)
 
 #=========================================================
 def assert_frames_equivalent(df1, df2, **kwds):

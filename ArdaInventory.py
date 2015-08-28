@@ -432,22 +432,46 @@ class ArdaInventory(object):
             
 
     def hybridize_process(self, fore_id, region, sector, price,
-            full_material=True, full_emissions=True,
+            full_material=True, full_emissions=True, full_intrasector=True,
             doublecounted_sectors = None):
 
         self.A_io_f.ix[:,fore_id] = self.A_io[region, sector]*price
 
+        all_sectors = self.A_io_f.index.get_level_values(1)
+
         if full_material:
-            all_sectors = self.A_io_f.index.get_level_values(1)
             bo = all_sectors.isin(self.io_material_sectors)
             self.A_io_f.ix[bo,fore_id] = 0.0
 
+        if full_intrasector:
+            bo = all_sectors.isin([sector])
+            self.A_io_f.ix[bo, fore_id] = 0.0
+
         if not full_emissions:
-            self.F_io_f.ix[:, fore_id] =self.F_io[region, sector]*price
+            self.F_io_f.ix[:, fore_id] = self.F_io[region, sector]*price
 
         if doublecounted_sectors is not None:
             for i in doublecounted_sectors:
                 self.A_io_f.ix[i, fore_id] = 0.0
+
+
+    def calc_lifecycle(self, stage):
+
+        I = pd.DataFrame(np.eye(len(self.A)),
+                         index=self.A.index,
+                         columns=self.A.columns)
+        x = pd.DataFrame(np.linalg.solve(I-self.A, self.y), index = self.A.index)
+
+        if stage == 'production':
+            return x
+
+        e = self.F.dot(x)
+        if stage == 'emissions':
+            return e
+
+        d = self.C_all.dot(e)
+        if stage == 'impacts':
+            return d
 
 
 def concat_keep_order(frame_list, index, axis=0, order_axis=[0]):
