@@ -444,12 +444,53 @@ class TestArdaInventory(unittest.TestCase):
         a.extract_foreground_from_matdict(self.matdict)
         a.extract_io_background_from_pymrio(mrio)
         a.io_material_sectors=['mining', 'food']
-        a.hybridize_process(('Batt Packing', 10002), 'reg2', 'transport', 0.1)
+
+        a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'), 0.1)
+
+        # assert that it got copied properly
+        self.assertEqual(
+                a.A.ix[('reg2', 'manufactoring'),('Batt Packing', 10002)],
+                a.A.ix[('reg2','manufactoring'), ('reg2','transport')]/10)
+
+        # assert that double counting form materioal inputs got corrected properly
+        self.assertEqual(a.A.ix[('reg1', 'food'),('Batt Packing', 10002)], 0)
+
+        # assert that intrasector flows were removed
+        self.assertEqual(a.A.ix[('reg1', 'transport'), ('Batt Packing', 10002)],
+                         0)
+
+        # assert that direct emissions did not get copied
+        self.assertEqual(a.F.ix[('emission_type1', 'air'),('Batt Packing',
+            10002)], 0)
+
+    def test_bulk_hybridization(self):
+
+        mrio = pymrio.load_test()
+        mrio.calc_all()
+        a = ArdaInventory.ArdaInventory([0,1])
+        a.extract_background_from_matdict(self.matdict)
+        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_io_background_from_pymrio(mrio)
+        a.io_material_sectors=['mining', 'food']
+
+        a.hyb.ix['first_hybrid','process_index'] = ('Batt Packing', 10002)
+        a.hyb.ix['first_hybrid','io_index'] = ('reg2', 'transport')
+        a.hyb.ix['first_hybrid','price_per_fu'] = 0.1
+
+        a.hyb.ix['second_hybrid','process_index'] = ('s+orm', 10005)
+        a.hyb.ix['second_hybrid','io_index'] = ('reg2', 'transport')
+        a.hyb.ix['second_hybrid','price_per_fu'] = 0.01
+        a.hyb.ix['second_hybrid', 'cpa'] = 'foo.03.04'
+        a.hybridize_multiple_processes()
 
         # assert that it got copied properly
         self.assertEqual(
                 a.A.ix[('reg2', 'manufactoring'),('Batt Packing', 10002)],
                 a.A.ix[('reg2','manufactoring'),('reg2','transport')]/10)
+
+        self.assertEqual(
+                a.A.ix[('reg2', 'manufactoring'),('s+orm', 10005)],
+                a.A.ix[('reg2','manufactoring'),('reg2','transport')]/100)
 
         # assert that double counting form materioal inputs got corrected properly
         self.assertEqual(a.A.ix[('reg1', 'food'),('Batt Packing', 10002)], 0)
