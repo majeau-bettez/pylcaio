@@ -131,11 +131,18 @@ class ArdaInventory(object):
 
         if  (overrule or len(self.PRO_f) == 0) and 'PRO_f' in matdict:
             PRO_f = mlt.mine_nested_array(matdict['PRO_f'])
-            PRO_header = mlt.mine_nested_array(matdict['PRO_header'])
+            try:
+                PRO_header = extract_header(
+                        mlt.mine_nested_array(matdict['PRO_header']))
+            except:
+                if len(self.PRO_b.columns) == PRO_f.shape[1]:
+                    PRO_header = self.PRO_b.columns
+                else:
+                    raise Exception("Cannot read PRO_header")
             self.PRO_f = pd.DataFrame(
                     data = PRO_f,
                     index = PRO_f[:, self._arda_default_labels].T.tolist(),
-                    columns = extract_header(PRO_header)
+                    columns = PRO_header
                     )
 
     def extract_background_from_matdict(self, matdict, overrule=True):
