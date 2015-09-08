@@ -244,14 +244,25 @@ class ArdaInventory(object):
                                    index=self.A_io.index,
                                    columns = PRO_header)
 
-        if (isinstance(mrio.emissions.S.index, pd.core.index.MultiIndex)
-            and not
-            isinstance(mrio.factor_inputs.S.index, pd.core.index.MultiIndex)):
-                twice = np.array([mrio.factor_inputs.S.index.values,
-                                  mrio.factor_inputs.S.index.values ])
-                mrio.factor_inputs.S.index = pd.MultiIndex.from_arrays(twice)
+        # Check if we have a mix of single-index and multi-index dataframes in
+        # the MRIO extensions
+        bo_singleIndex = False
+        bo_multiIndex = False
+        for i in mrio.get_extensions(True):
+            if (isinstance(i.S.index, pd.core.index.MultiIndex)):
+                bo_multiIndex=True
+            else:
+                bo_singleIndex=True
 
-        self.F_io = pd.concat([mrio.emissions.S, mrio.factor_inputs.S])
+        # Combine all extensions as one
+        for i in mrio.get_extensions(True):
+            # if necessary, turn single-index dataframes in multiIndex ones
+            if (bo_multiIndex
+               and bo_singleIndex
+               and not isinstance(i.S.index, pd.core.index.MultiIndex)):
+                twice = np.array([i.S.index.values, i.S.index.values ])
+                i.S.index = pd.MultiIndex.from_arrays(twice)
+            self.F_io = pd.concat([self.F_io, i.S])
 
         # get STR labels and units (as last column)
         units_str = pd.concat([mrio.emissions.unit, mrio.factor_inputs.unit]
