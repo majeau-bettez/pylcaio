@@ -257,6 +257,7 @@ class ArdaInventory(object):
                 bo_singleIndex=True
 
         # Combine all extensions as one
+        units_str=pd.DataFrame([])
         for i in mrio.get_extensions(True):
             # if necessary, turn single-index dataframes in multiIndex ones
             if (max_names > 1 and bo_singleIndex and not isinstance(i.S.index, pd.core.index.MultiIndex)):
@@ -265,13 +266,12 @@ class ArdaInventory(object):
                     tmp.append(i.S.index.values)
                 i.S.index = pd.MultiIndex.from_arrays(np.array(tmp))
             self.F_io = pd.concat([self.F_io, i.S])
+            units_str = pd.concat([units_str, i.unit])
             self.F_io.index.names = max_headers
 
         # get STR labels and units (as last column)
-        units_str = pd.concat([mrio.emissions.unit, mrio.factor_inputs.unit]
-                              ).values
         STR_io = np.hstack((np.array([list(r) for r in self.F_io.index]),
-                            units_str))
+                            units_str.values))
 
         # get STR header
         STR_header = [x.upper() for x in self.F_io.index.names]
