@@ -4,6 +4,7 @@ import scipy.io as sio
 import scipy.sparse
 import sys
 import IPython
+import copy
 
 sys.path.append('/home/bill/software/Python/Modules/')
 import matlab_tools as mlt
@@ -53,6 +54,8 @@ class ArdaInventory(object):
                                          'io_index',
                                          'price_per_fu'])
 
+
+# PROPERTIES
     @property
     def PRO(self):
         pro =  pd.concat([self.PRO_f, self.PRO_b, self.PRO_io], axis=0)
@@ -95,7 +98,7 @@ class ArdaInventory(object):
         y_pro =  pd.concat([self.y_f, self.y_b], axis=0)
         return y_pro.reindex_axis(self.PRO.index, axis=0).fillna(0.0)
 
-
+# METHODS
     def extract_labels_from_matdict(self, matdict, overrule):
 
         if  (overrule or len(self.STR) == 0) and 'STR' in matdict:
@@ -186,7 +189,7 @@ class ArdaInventory(object):
             raise Warning('No final demand found')
 
     def extract_io_background_from_pymrio(self, mrio, pro_name_cols=None,
-            str_name_cols=None):
+            str_name_cols=None,): 
 
         def generate_fullname(label, header, name_cols):
             # define a "fullname" column as the first column of the process labels
@@ -267,14 +270,14 @@ class ArdaInventory(object):
         units_str=pd.DataFrame([])
         for i in mrio.get_extensions(True):
             # if necessary, turn single-index dataframes in multiIndex ones
-            if (max_names > 1 and bo_singleIndex and not isinstance(i.S.index, pd.core.index.MultiIndex)):
-                tmp = []
-                for j in range(max_names):
-                    tmp.append(i.S.index.values)
-                i.S.index = pd.MultiIndex.from_arrays(np.array(tmp))
+#            if (max_names > 1 and bo_singleIndex and not isinstance(i.S.index, pd.core.index.MultiIndex)):
+# TODO: NEEDS TESTING next line
+            i.S.index = augment_index(i.S.index, max_names)
             self.F_io = pd.concat([self.F_io, i.S])
             units_str = pd.concat([units_str, i.unit])
             self.F_io.index.names = max_headers
+
+
 
         # get STR labels and units (as last column)
         STR_io = np.hstack((np.array([list(r) for r in self.F_io.index]),
@@ -307,11 +310,51 @@ class ArdaInventory(object):
         self.F_io_f = pd.DataFrame(index=self.F_io.index,
                                    columns=self.A_ff.columns).fillna(0.0)
 
-        self.IMP_io = self.STR_io.copy()
-        self.C_io = pd.DataFrame(index=self.F_io.index,
-                                 columns=self.F_io.index,
-                                 data=np.eye(self.STR_io.index.values.shape[0]))
+    def extract_exiobase2_characterisation_factors(self,
+            char_filename='characterisation_CREEA_version2.2.0.xlsx',
+            xlschar_param=None):
 
+        if xlschar_param is None:
+            xlschar_param = {
+                    'Q_emission':
+                        (['impact', 'unit'], ['stressor','comp'],[2], [0,2]),
+                    'Q_factorinputs':
+                        (['impact', 'unit'], ['stressor'], [1], None),
+                    'Q_resources':
+                        (['impact', 'unit'], ['stressor','comp'], [2], None),
+                    'Q_materials':
+                        (['impact', 'unit'], ['stressor'], None, None)}
+
+            # find widest index and columns
+            max_cols=0
+            max_index=0
+            for key in xlschar_param.keys():
+                index_width = len(xlschar_param[key][0])
+                if index_width > max_index:
+                    max_index = copy.deepcopy(index_width)
+                col_width = len(xlschar_param[key][1])
+                if col_width > max_cols:
+                    max_cols = copy.deepcopy(col_width)
+
+
+        C = pd.DataFrame()
+        for key in xlschar_param.keys():
+            par = xlschar_param[key]
+            c = extract_char(char_filename, key, par[0], par[1], par[2], par[3])
+            c.index = augment_index(c.index, max_index)
+            c.columns = augment_index(c.columns, max_cols)
+            C = pd.concat([C, c], join='outer')
+
+
+        IPython.embed()
+        self.C_io = C.reindex_axis(self.F_io.index, axis='columns')
+
+
+        self.IMP_io = pd.DataFrame(index = self.C_io.index,
+                                   columns = self.C_io.index.names,
+                                   data = [list(i) for i in
+                                               self.C_io.index.values.tolist()]
+                                   )
 
     def match_foreground_to_background(self):
 
@@ -554,3 +597,51 @@ def i2s(a):
     a.index = a.index.to_series()
     a.columns = a.columns.to_series()
     return a
+
+def extract_char(char_filename, sheet,
+                 index_headers, col_headers, drop_rows, drop_cols):
+    # width of columns and headers
+    col_width=len(col_headers)
+    index_width=len(index_headers)
+
+    # read in whole sheet
+    raw = pd.read_excel(char_filename,
+                        sheet, index_col=None, header=None)
+    # remove extraneous rows and columns
+    if drop_rows is not None:
+        raw = raw.drop(drop_rows, axis=0)
+    if drop_cols is not None:
+        raw = raw.drop(drop_cols, axis=1)
+
+    # make a dataframe with selected indexes
+    df = pd.DataFrame(
+            data=raw.iloc[col_width:, index_width:].fillna(0).values,
+            index=pd.MultiIndex.from_arrays(
+                raw.iloc[col_width:, :index_width].fillna('').values.T,
+                names=index_headers),
+            columns=pd.MultiIndex.from_arrays(
+                raw.iloc[:col_width, index_width:].fillna('').values,
+                names=col_headers)
+            )
+    return df
+
+def augment_index(index, width=None, headers=None):
+    index = index.copy()
+    tmp = []
+
+    if width is None:
+        width = len(headers)
+
+    if len(index.names) == width:
+        pass # all is fine
+    elif len(index.names) == 1:
+        for j in range(width):
+            tmp.append(index.values)
+        index = pd.MultiIndex.from_arrays(np.array(tmp))
+    else:
+        print("Warning, multi-index widening not implemented")
+
+    if headers is not None:
+        index.names=headers
+
+    return index
