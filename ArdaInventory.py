@@ -215,6 +215,13 @@ class ArdaInventory(object):
             return new_iolabels, new_header
 
 
+        # Clean up MRIO
+        mrio.reset_all_to_coefficients()
+        if mrio.unit is None:
+            mrio.unit = pd.DataFrame(index=mrio.A.index, columns=['UNIT'])
+            mrio.unit.loc[:,'UNIT'] = 'M.EUR.'
+
+
         self.A_io = mrio.A.copy()
 
 
