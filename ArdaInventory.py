@@ -11,7 +11,8 @@ import matlab_tools as mlt
 import matrix_view as mtv
 
 class ArdaInventory(object):
-    """ A common data structure for an Arda template"""
+    """Object to handle an LCA inventory and hybridize it with an EEIO table
+    """
 
 
     def __init__(self, index_columns=[1]):
@@ -58,6 +59,7 @@ class ArdaInventory(object):
 # PROPERTIES
     @property
     def PRO(self):
+        """ Process/sector labels for whole system """
         pro =  pd.concat([self.PRO_f, self.PRO_b, self.PRO_io], axis=0)
         return reorder_cols(pro.fillna(''))
 
@@ -98,7 +100,9 @@ class ArdaInventory(object):
         y_pro =  pd.concat([self.y_f, self.y_b], axis=0)
         return y_pro.reindex_axis(self.PRO.index, axis=0).fillna(0.0)
 
+#=============================================================================
 # METHODS
+#=============================================================================
     def extract_labels_from_matdict(self, matdict, overrule):
 
         if  (overrule or len(self.STR) == 0) and 'STR' in matdict:
@@ -317,13 +321,14 @@ class ArdaInventory(object):
         if xlschar_param is None:
             xlschar_param = {
                     'Q_emission':
+                        # INDEX HEADERS    ,  COL HEADERS , ROWS_DROP, COL_DROP
                         (['impact', 'unit'], ['stressor','comp'],[2], [0,2]),
                     'Q_factorinputs':
                         (['impact', 'unit'], ['stressor'], [1], None),
                     'Q_resources':
-                        (['impact', 'unit'], ['stressor','comp'], [2], None),
+                        (['impact', 'unit'], ['stressor'], [1,2], None),
                     'Q_materials':
-                        (['impact', 'unit'], ['stressor'], None, None)}
+                        (['impact', 'unit'], ['stressor'], [1] , None)}
 
             # find widest index and columns
             max_cols=0
@@ -345,11 +350,24 @@ class ArdaInventory(object):
             c.columns = augment_index(c.columns, max_cols)
             C = pd.concat([C, c], join='outer')
 
+        # characterized stressors that would get lost in processing?
+        diff = set(C.columns) - set(self.F_io.index)
+        if len(diff):
+            print("WARNING: some characterized stressors seem lost in matching.")
 
-        IPython.embed()
-        self.C_io = C.reindex_axis(self.F_io.index, axis='columns')
+        # inventoried "stressors" that will not be characterized
+        diff = set(self.F_io.index) - set(C.columns)
+        if len(diff) == C.shape[0]:
+            # mostly likely pre-characterised impacts that were part of the
+            # stressor matrix: drop them
+            self.F_io = self.F_io.drop(list(diff))
+            self.STR_io = self.STR_io.drop(list(diff))
+        elif len(diff) != 0:
+            print("Warning, some inventoried stressors not characterized")
+        else:
+             pass
 
-
+        self.C_io = C.reindex_axis(self.F_io.index, axis='columns').fillna(0)
         self.IMP_io = pd.DataFrame(index = self.C_io.index,
                                    columns = self.C_io.index.names,
                                    data = [list(i) for i in
