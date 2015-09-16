@@ -10,7 +10,7 @@ sys.path.append('/home/bill/software/Python/Modules/')
 import matlab_tools as mlt
 import matrix_view as mtv
 
-class ArdaInventory(object):
+class ArdaInventoryHybridizer(object):
     """Object to handle an LCA inventory and hybridize it with an EEIO table
     """
 
