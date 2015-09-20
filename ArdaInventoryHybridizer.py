@@ -49,7 +49,7 @@ class ArdaInventoryHybridizer(object):
         self.F_io_f = pd.DataFrame()
         self.C_io = pd.DataFrame()
 
-        self.io_material_sectors=np.array([])
+        self.io_sectors={}
 
         self.hyb = pd.DataFrame(columns=['process_index',
                                          'io_index',
@@ -529,51 +529,38 @@ class ArdaInventoryHybridizer(object):
                           process_index,
                           io_index,
                           price,
-                          full_material=True,
                           full_emissions=True,
                           full_intrasector=True,
-                          doublecounted_sectors=None,
+                          doublecounted_categories=tuple(),
+                          doublecounted_sectors=tuple(),
                           sector_level_name='sector'):
 
-        self.A_io_f.ix[:, process_index] = self.A_io.ix[:, io_index] * price
-
         all_sectors = self.A_io_f.index.get_level_values(sector_level_name)
+
+        # input structures of sector to hybridize
+        self.A_io_f.ix[:, process_index] = self.A_io.ix[:, io_index] * price
 
         # get name of sector of interest
         bo = (self.A_io.index.to_series() == io_index).values
         sector = all_sectors[bo].tolist()[0]
 
-        if full_material:
-            bo = all_sectors.isin(self.io_material_sectors)
-            self.A_io_f.ix[bo, process_index] = 0.0
-
         if full_intrasector:
+        # Remove all inputs from sector to which process belongs
             bo = all_sectors.isin([sector])
             self.A_io_f.ix[bo, process_index] = 0.0
 
         if not full_emissions:
+            # Remove all direct emissions from sector to which process belongs
             self.F_io_f.ix[:, process_index] = self.F_io[region, sector]*price
 
-        if doublecounted_sectors is not None:
-            for i in doublecounted_sectors:
-                self.A_io_f.ix[i, process_index] = 0.0
+        # Remove all inputs from categories of the economy
+        for cat in doublecounted_categories:
+            bo = all_sectors.isin(self.io_categories[cat])
+            self.A_io_f.ix[bo, process_index] = 0.0
 
-    def hybridize_multiple_processes(self,
-                                     full_material=True,
-                                     full_emissions=True,
-                                     full_intrasector=True,
-                                     doublecounted_sectors=None,
-                                     sector_level_name='sector'):
-
-        for i, row in self.hyb.iterrows():
-            self.hybridize_process(row.process_index,
-                                   row.io_index,
-                                   row.price_per_fu,
-                                   full_material=full_material,
-                                   full_emissions=full_emissions,
-                                   full_intrasector=full_intrasector,
-                                   doublecounted_sectors=doublecounted_sectors,
-                                   sector_level_name=sector_level_name)
+        # Remove all inputs from specific sectors
+        for i in doublecounted_sectors:
+            self.A_io_f.ix[i, process_index] = 0.0
 
     def calc_lifecycle(self, stage):
 
