@@ -49,7 +49,7 @@ class ArdaInventoryHybridizer(object):
         self.F_io_f = pd.DataFrame()
         self.C_io = pd.DataFrame()
 
-        self.io_sectors={}
+        self.io_categories={}
 
         self.hyb = pd.DataFrame(columns=['process_index',
                                          'io_index',
