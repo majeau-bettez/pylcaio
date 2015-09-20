@@ -449,13 +449,12 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
         a.extract_io_background_from_pymrio(mrio)
 
         # Define two categories of IO flows
-        a.io_categories={'material':['mining', 'food'],
-                         'energy':['electricity'] }
+        a.io_categories['material']=['mining', 'food']
+        a.io_categories['energy']=['electricity']
 
         # Hybridize, correcting for double counting in these two categories
         a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
                 0.1, doublecounted_categories=('material','energy'))
-        IPython.embed()
 
         # assert that it got copied properly
         self.assertEqual(
