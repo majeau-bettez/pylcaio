@@ -192,34 +192,29 @@ class ArdaInventoryHybridizer(object):
         except:
             raise Warning('No final demand found')
 
+    def reconcile_ids(self, io_label, arda_label, header):
+
+        # calculate smallest id not conflicting with that of arda_label
+        a = np.max(arda_label.iloc[:,self._ardaId_column])
+        order_magnitude = int(np.math.floor(np.math.log10(abs(a))))
+        min_id = np.around(a, -order_magnitude) + 10**order_magnitude + 1
+        new_ids = np.array(
+                [i for i in range(min_id, min_id  + io_label.shape[0])]
+                ).reshape((io_label.shape[0], 1))
+
+        new_iolabels = np.hstack((io_label[:, :self._ardaId_column],
+                                  new_ids,
+                                  io_label[:, self._ardaId_column:]))
+        new_header = (header[: self._ardaId_column]
+                             + [arda_label.columns[self._ardaId_column]]
+                             + header[self._ardaId_column:])
+
+        return new_iolabels, new_header
+
     def extract_io_background_from_pymrio(self, mrio, pro_name_cols=None,
             str_name_cols=None,): 
 
-        def generate_fullname(label, header, name_cols):
-            # define a "fullname" column as the first column of the process labels
-            fullname = np.empty((label.shape[0], 1), dtype='object')
-            for i in range(label.shape[0]):
-                fullname[i] = '/ '.join(label[i, name_cols])
-            label = np.hstack((fullname, label))
-            header = ['FULLNAME'] + header
-            return label, header
 
-        def reconcile_ids(io_label, arda_label, header):
-            a = np.max(arda_label.iloc[:,self._ardaId_column])
-            order_magnitude = int(np.math.floor(np.math.log10(abs(a))))
-            min_id = np.around(a, -order_magnitude) + 10**order_magnitude + 1
-            new_ids = np.array(
-                    [i for i in range(min_id, min_id  + io_label.shape[0])]
-                    ).reshape((io_label.shape[0], 1))
-
-            new_iolabels = np.hstack((io_label[:, :self._ardaId_column],
-                                      new_ids,
-                                      io_label[:, self._ardaId_column:]))
-            new_header = (header[: self._ardaId_column]
-                                 + [arda_label.columns[self._ardaId_column]]
-                                 + header[self._ardaId_column:])
-
-            return new_iolabels, new_header
 
 
         # Clean up MRIO
@@ -251,7 +246,7 @@ class ArdaInventoryHybridizer(object):
 #            PRO_header = ['FULL NAME'] + PRO_header
 
         # define some numeric ID for each process, put in second column
-        PRO_io, PRO_header= reconcile_ids(PRO_io, self.PRO, PRO_header)
+        PRO_io, PRO_header= self.reconcile_ids(PRO_io, self.PRO, PRO_header)
 
         self.PRO_io = pd.DataFrame(PRO_io,
                                    #index=PRO_io[:,self._arda_default_labels].T.tolist(),
@@ -299,7 +294,7 @@ class ArdaInventoryHybridizer(object):
                                                    str_name_cols)
 
         # define some numeric ID for each stressor, put in second column
-        STR_io, STR_header= reconcile_ids(STR_io, self.STR, STR_header)
+        STR_io, STR_header= self.reconcile_ids(STR_io, self.STR, STR_header)
 
         self.STR_io = pd.DataFrame(
                 STR_io,
@@ -316,7 +311,7 @@ class ArdaInventoryHybridizer(object):
 
     def extract_exiobase2_characterisation_factors(self,
             char_filename='characterisation_CREEA_version2.2.0.xlsx',
-            xlschar_param=None):
+            xlschar_param=None, name_cols=[0]):
 
         if xlschar_param is None:
             xlschar_param = {
@@ -368,11 +363,18 @@ class ArdaInventoryHybridizer(object):
              pass
 
         self.C_io = C.reindex_axis(self.F_io.index, axis='columns').fillna(0)
+        IMP_header = extract_header(self.C_io.index.names)
+        IMP = np.array([list(i) for i in self.C_io.index.values.tolist()],
+                       dtype=object)
+        IMP, IMP_header = generate_fullname(IMP, IMP_header, name_cols)
+        IMP, IMP_header = self.reconcile_ids(IMP, self.IMP, IMP_header)
+
         self.IMP_io = pd.DataFrame(index = self.C_io.index,
-                                   columns = self.C_io.index.names,
-                                   data = [list(i) for i in
-                                               self.C_io.index.values.tolist()]
-                                   )
+                                   columns = IMP_header,
+                                   data = IMP)
+        # todo: must have fullname, and numerical id
+        #       UNIT, not unit
+        #       NAME, not impact?
 
     def match_foreground_to_background(self):
 
@@ -599,12 +601,41 @@ def concat_keep_order(frame_list, index, axis=0, order_axis=[0]):
     return c
 
 def extract_header(header):
-    the_list = header.squeeze().tolist()
+    """
+
+    ARGS
+    ----
+
+    header:
+        * Numpy array OR Pandas Dataframe that can be squeezed to 1D
+        * OR 1D list of headers
+   """ 
+
+
+    try:
+        # for numpy or pandas
+        the_list = header.squeeze().tolist()
+    except AttributeError:
+        # for list
+        the_list = header
+
     the_list = [x.upper() for x in the_list]
     the_list = [x.replace('ARDAID','MATRIXID') for x in the_list]
     the_list = [x.replace('FULL NAME','FULLNAME') for x in the_list]
     the_list = [x.replace('COMPARTMENT','COMP') for x in the_list]
     return the_list
+
+def generate_fullname(label, header, name_cols):
+    """ Prepend a "fullname" column before a label dataframe 
+
+    """
+    # define a "fullname" column as the first column of the process labels
+    fullname = np.empty((label.shape[0], 1), dtype='object')
+    for i in range(label.shape[0]):
+        fullname[i] = '/ '.join(label[i, name_cols])
+    label = np.hstack((fullname, label))
+    header = ['FULLNAME'] + header
+    return label, header
 
 def reorder_cols(a):
     cols = a.columns - ['FULLNAME', 'MATRIXID','UNIT']
