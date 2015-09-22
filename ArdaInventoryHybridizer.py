@@ -5,6 +5,7 @@ import scipy.sparse
 import sys
 import IPython
 import copy
+import logging
 
 sys.path.append('/home/bill/software/Python/Modules/')
 import matlab_tools as mlt
@@ -15,7 +16,7 @@ class ArdaInventoryHybridizer(object):
     """
 
 
-    def __init__(self, index_columns=[1]):
+    def __init__(self, index_columns=[1], verbose=True):
 
         # extended Labels
         self.PRO_f = pd.DataFrame()
@@ -54,6 +55,23 @@ class ArdaInventoryHybridizer(object):
         self.hyb = pd.DataFrame(columns=['process_index',
                                          'io_index',
                                          'price_per_fu'])
+
+        # DEFINE LOG TOOL
+        self.log = logging.getLogger()
+        self.log.setLevel(logging.INFO)
+        self.log.handlers = []                            # reset handlers
+        if verbose:
+            ch = logging.StreamHandler()
+            ch.setLevel(logging.INFO)
+        fh = logging.FileHandler('ArdaInventoryHybridizer.log')
+        fh.setLevel(logging.INFO)
+        aformat = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        formatter = logging.Formatter(aformat)
+        fh.setFormatter(formatter)
+        self.log.addHandler(fh)
+        if verbose:
+            ch.setFormatter(formatter)
+            self.log.addHandler(ch)
 
 
 # PROPERTIES
@@ -358,7 +376,7 @@ class ArdaInventoryHybridizer(object):
             self.F_io = self.F_io.drop(list(diff))
             self.STR_io = self.STR_io.drop(list(diff))
         elif len(diff) != 0:
-            print("Warning, some inventoried stressors not characterized")
+            raise Warning("Warning, some inventoried stressors not characterized")
         else:
              pass
 

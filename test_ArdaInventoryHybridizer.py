@@ -109,11 +109,13 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
         self.smalldict['y_gen'] = scipy.sparse.csc_matrix(np.zeros((3, 1)))
         self.smalldict['F_gen'] = scipy.sparse.csc_matrix(np.zeros((3, 3)))
 
+        self.mrio = pymrio.load_test()
+        self.mrio.calc_all()
 
     def test_append_to_foreground(self):
 
-        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer(1)
-        b = ArdaInventoryHybridizer.ArdaInventoryHybridizer(1)
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer(1, verbose=False)
+        b = ArdaInventoryHybridizer.ArdaInventoryHybridizer(1, verbose=False)
         a.extract_background_from_matdict(self.matdict)
         a.extract_foreground_from_matdict(self.matdict)
 
@@ -152,7 +154,7 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
 
     def test_import_and_export_matdict_keys_roundtrip(self):
 
-        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer()
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer(verbose=False)
         a.extract_background_from_matdict(self.matdict)
         a.to_matfile('/tmp/test_background.mat', foreground=False, background=True)
         a.extract_foreground_from_matdict(self.matdict)
@@ -165,25 +167,23 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
 
     def test_extract_io_background_from_pymrio(self):
 
-        mrio = pymrio.load_test()
-        mrio.calc_all()
-        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer()
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer(verbose=False)
         a.extract_background_from_matdict(self.matdict)
-        a.extract_io_background_from_pymrio(mrio)
+        a.extract_io_background_from_pymrio(self.mrio)
 
         # assertion1
-        assert(np.all(a.A_io.values == mrio.A.values))
+        assert(np.all(a.A_io.values == self.mrio.A.values))
 
         # assertion2: stest extensions preserved
-        self.assertAlmostEqual(a.F_io.values.sum(), mrio.emissions.S.values.sum() +
-                                      mrio.factor_inputs.S.values.sum())
+        self.assertAlmostEqual(a.F_io.values.sum(), self.mrio.emissions.S.values.sum() +
+                                      self.mrio.factor_inputs.S.values.sum())
 
     def test_match_foreground_background_trivial(self):
-        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer()
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer(verbose=False)
         a.extract_background_from_matdict(self.matdict)
         a.extract_foreground_from_matdict(self.matdict)
 
-        b = ArdaInventoryHybridizer.ArdaInventoryHybridizer()
+        b = ArdaInventoryHybridizer.ArdaInventoryHybridizer(verbose=False)
         b.extract_background_from_matdict(self.matdict)
         b.extract_foreground_from_matdict(self.matdict)
 
@@ -192,7 +192,7 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
         assert(np.all(a.F_f == b.F_f))
 
     def test_match_foreground_background(self):
-        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer()
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer(verbose=False)
         a.extract_foreground_from_matdict(self.matdict)
         a.extract_background_from_matdict(self.bigdict)
         a.match_foreground_to_background()
@@ -204,7 +204,7 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
 
         
     def test_match_foreground_background_flowlosses(self):
-        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer()
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer(verbose=False)
         a.extract_foreground_from_matdict(self.matdict)
         a.extract_background_from_matdict(self.smalldict)
         with self.assertRaises(ValueError):
@@ -212,7 +212,7 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
 
 
     def test_delete_processes_foreground(self):
-        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer(1)
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer(1, verbose=False)
         a.extract_foreground_from_matdict(self.matdict)
         a.delete_processes_foreground([10005])
 
@@ -243,7 +243,7 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
 
         B['y_f'] = scipy.sparse.csc_matrix([[0.0]])
 
-        b = ArdaInventoryHybridizer.ArdaInventoryHybridizer(1)
+        b = ArdaInventoryHybridizer.ArdaInventoryHybridizer(1, verbose=False)
         b.extract_background_from_matdict(self.matdict)
         b.extract_foreground_from_matdict(B)
         pdt.assert_frame_equal(a.A_ff, b.A_ff)
@@ -254,8 +254,8 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
         assert(np.all(a.PRO_f == b.PRO_f))
 
     def test_append_to_foreground_w_ValueError(self):
-        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer()
-        b = ArdaInventoryHybridizer.ArdaInventoryHybridizer()
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer(verbose=False)
+        b = ArdaInventoryHybridizer.ArdaInventoryHybridizer(verbose=False)
         a.extract_foreground_from_matdict(self.matdict)
         b.extract_foreground_from_matdict(self.matdict)
 
@@ -263,8 +263,8 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
             a.append_to_foreground(b)
 
     def test_append_to_foreground_with_final_demand(self):
-        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer(1)
-        b = ArdaInventoryHybridizer.ArdaInventoryHybridizer(1)
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer(1, verbose=False)
+        b = ArdaInventoryHybridizer.ArdaInventoryHybridizer(1, verbose=False)
         a.extract_background_from_matdict(self.matdict)
         b.extract_background_from_matdict(self.matdict)
 
@@ -326,8 +326,8 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
 
     def test_append_to_foreground_w_ValueError_w_multiindex(self):
         index = [0, 1 , -1]
-        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer(index)
-        b = ArdaInventoryHybridizer.ArdaInventoryHybridizer(index)
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer(index, verbose=False)
+        b = ArdaInventoryHybridizer.ArdaInventoryHybridizer(index, verbose=False)
         a.extract_foreground_from_matdict(self.matdict)
         b.extract_foreground_from_matdict(self.matdict)
 
@@ -335,8 +335,8 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
             a.append_to_foreground(b)
 
     def test_append_to_foreground_multiindex(self):
-        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer([0,1,-1])
-        b = ArdaInventoryHybridizer.ArdaInventoryHybridizer([0, 1, -1])
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer([0,1,-1], verbose=False)
+        b = ArdaInventoryHybridizer.ArdaInventoryHybridizer([0, 1, -1], verbose=False)
         a.extract_foreground_from_matdict(self.matdict)
 
         B = {}
@@ -394,7 +394,7 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
         assert_frames_equivalent(a.A_bf, A_bf)
 
     def test_change_process_ids(self):
-        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer([1])
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer([1], verbose=False)
         a.extract_foreground_from_matdict(self.matdict)
 
         a.increase_foreground_process_ids(70000)
@@ -409,12 +409,10 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
         assert(np.all(a.PRO_f == PRO_f))
 
     def test_properties_singleindex(self):
-        mrio = pymrio.load_test()
-        mrio.calc_all()
-        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer([1])
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer([1], verbose=False)
         a.extract_background_from_matdict(self.matdict)
         a.extract_foreground_from_matdict(self.matdict)
-        a.extract_io_background_from_pymrio(mrio)
+        a.extract_io_background_from_pymrio(self.mrio)
 
         a.A
         a.F
@@ -423,12 +421,10 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
         a.C_all
 
     def test_properties_multiindex(self):
-        mrio = pymrio.load_test()
-        mrio.calc_all()
-        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer([0,1])
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer([0,1], verbose=False)
         a.extract_background_from_matdict(self.matdict)
         a.extract_foreground_from_matdict(self.matdict)
-        a.extract_io_background_from_pymrio(mrio)
+        a.extract_io_background_from_pymrio(self.mrio)
 
         a.A
         a.F
@@ -438,15 +434,12 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
 
     def test_hybridization_detail(self):
 
-        # define mrio system
-        mrio = pymrio.load_test()
-        mrio.calc_all()
 
         # define arda inventory object and populate
-        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer([0,1])
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer([0,1], verbose=False)
         a.extract_background_from_matdict(self.matdict)
         a.extract_foreground_from_matdict(self.matdict)
-        a.extract_io_background_from_pymrio(mrio)
+        a.extract_io_background_from_pymrio(self.mrio)
 
         # Define two categories of IO flows
         a.io_categories['material']=['mining', 'food']
@@ -476,7 +469,7 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
 
     def test_calc_lifecycle(self):
 
-        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer([0,1])
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer([0,1], verbose=False)
         a.extract_background_from_matdict(self.matdict)
         a.extract_foreground_from_matdict(self.matdict)
         x = a.calc_lifecycle('production')
