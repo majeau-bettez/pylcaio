@@ -467,6 +467,61 @@ class TestArdaInventoryHybridizer(unittest.TestCase):
         self.assertEqual(a.F.ix[('emission_type1', 'air'),('Batt Packing',
             10002)], 0)
 
+    def test_hybridization_NoOverwrite(self):
+
+        # define arda inventory object and populate
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer([0,1], verbose=False)
+        a.extract_background_from_matdict(self.matdict)
+        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_io_background_from_pymrio(self.mrio)
+
+        # Define two categories of IO flows
+        a.io_categories['material']=['mining', 'food']
+        a.io_categories['energy']=['electricity']
+
+        # Hybridize, correcting for double counting in these two categories
+        a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
+                0.1, doublecounted_categories=('material','energy'))
+
+        A_io_f_0 = a.A_io_f.copy()
+
+        # Hybridize second time
+        a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
+                1E9, doublecounted_categories=('material','energy'))
+
+        # assert that second hybridization did not happen
+        assert_frames_equivalent(A_io_f_0, a.A_io_f)
+
+
+    def test_hybridization_withOverwrite(self):
+
+
+        # define arda inventory object and populate
+        a = ArdaInventoryHybridizer.ArdaInventoryHybridizer([0,1], verbose=False)
+        a.extract_background_from_matdict(self.matdict)
+        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_io_background_from_pymrio(self.mrio)
+
+        # Define two categories of IO flows
+        a.io_categories['material']=['mining', 'food']
+        a.io_categories['energy']=['electricity']
+
+        # Hybridize, correcting for double counting in these two categories
+        a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
+                0.1, doublecounted_categories=('material','energy'),
+                overwrite=True, verbose=True)
+
+        A_io_f_0 = a.A_io_f.copy()
+
+        # Hybridize second time
+        a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
+                1E9, doublecounted_categories=('material','energy'),
+                overwrite=True, verbose=True)
+
+        # assert that second hybridization DID happen
+        self.assertTrue(np.all(a.A_io_f >= A_io_f_0))
+
+
     def test_calc_lifecycle(self):
 
         a = ArdaInventoryHybridizer.ArdaInventoryHybridizer([0,1], verbose=False)

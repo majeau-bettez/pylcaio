@@ -547,12 +547,25 @@ class ArdaInventoryHybridizer(object):
                           process_index,
                           io_index,
                           price,
-                          full_emissions=True,
-                          full_intrasector=True,
+                          doublecounted_intrasector=1,
                           doublecounted_categories=tuple(),
                           doublecounted_sectors=tuple(),
-                          sector_level_name='sector'):
+                          sector_level_name='sector',
+                          overwrite=False,
+                          verbose=True):
 
+        # Check whether there are already signs of hybrization, i.e., non-null
+        # entries in self.A_io_f matrix
+        if np.any(self.A_io_f.ix[:, process_index].values != 0):
+            if not overwrite:
+                if verbose:
+                    msg = "Non-zero entries in A_io_f for sector {}. It seems already hybridized. Aborting hybridization."
+                    self.log.warning(msg.format(process_index))
+                return
+            else:
+                if verbose:
+                    msg = "Non-zero entries in A_io_f for sector {}. About to overwrite them. These will be lost."
+                    self.log.warning(msg.format(process_index))
         all_sectors = self.A_io_f.index.get_level_values(sector_level_name)
 
         # input structures of sector to hybridize
@@ -562,14 +575,11 @@ class ArdaInventoryHybridizer(object):
         bo = (self.A_io.index.to_series() == io_index).values
         sector = all_sectors[bo].tolist()[0]
 
-        if full_intrasector:
+
+        if doublecounted_intrasector:
         # Remove all inputs from sector to which process belongs
             bo = all_sectors.isin([sector])
-            self.A_io_f.ix[bo, process_index] = 0.0
-
-        if not full_emissions:
-            # Remove all direct emissions from sector to which process belongs
-            self.F_io_f.ix[:, process_index] = self.F_io[region, sector]*price
+            self.A_io_f.ix[bo, process_index] *= (1.0 - doublecounted_intrasector)
 
         # Remove all inputs from categories of the economy
         for cat in doublecounted_categories:
