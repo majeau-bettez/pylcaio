@@ -213,6 +213,7 @@ class LCAIO(object):
 # ---------------------- DATA INPUT AND OUTPUT--------------------------------
 #
     def __extract_labels_from_matdict(self, matdict, overwrite):
+        """Extracts labels (PRO, STR, etc.) from matlab dictionnary"""
 
         if  (overwrite or len(self.STR) == 0) and 'STR' in matdict:
             STR = mine_nested_array(matdict['STR'])
@@ -262,6 +263,17 @@ class LCAIO(object):
                     )
 
     def extract_background(self, datasource, overwrite=True):
+        """ Extract LCA background, from Matlab .mat file or similar
+
+        Args
+        ----
+        * datasource: either filename of Matlab .mat file
+                      OR
+                      name of dictionnary produced by scipy.load_mat()
+        * overwrite: By default, overwrite any previously read label in the
+                     object attributes
+
+        """
 
         try:
             # Treat datasource as filename
@@ -290,6 +302,17 @@ class LCAIO(object):
                                     index=self.PRO_b.index)
 
     def extract_foreground(self, datasource, overwrite=True):
+        """ Extract LCA foreground, from Matlab .mat file or similar
+
+        Args
+        ----
+        * datasource: either filename of Matlab .mat file
+                      OR
+                      name of dictionnary produced by scipy.load_mat()
+        * overwrite: By default, overwrite any previously read label in the
+                     object attributes
+
+        """
 
         try:
             # Treat datasource as filename
@@ -322,8 +345,17 @@ class LCAIO(object):
 
 
 
-    def extract_io_background_from_pymrio(self, mrio, pro_name_cols=None,
-            str_name_cols=None,): 
+    def extract_io_background_from_pymrio(self, mrio, pro_name_cols=None, str_name_cols=None,):
+        """ Extract EEIO matrices from pyMRIO object
+
+        Args
+        ----
+            * mrio: the pyMRIO object
+            * pro_name_cols: PRO label columns to include in compilation of
+                             "fullname"
+            * str_name_cols: STR label columns to include in compilation of
+                             "fullname"
+        """
 
         # Clean up MRIO
         mrio.reset_all_to_coefficients()
@@ -347,11 +379,6 @@ class LCAIO(object):
             PRO_io, PRO_header = generate_fullname(PRO_io,
                                                    PRO_header,
                                                    pro_name_cols)
-#            fullname = np.empty((PRO_io.shape[0], 1), dtype='object')
-#            for i in range(PRO_io.shape[0]):
-#                fullname[i] = '/ '.join(PRO_io[i, pro_name_cols])
-#            PRO_io = np.hstack((fullname, PRO_io))
-#            PRO_header = ['FULL NAME'] + PRO_header
 
         # define some numeric ID for each process, put in second column
         PRO_io, PRO_header= self.__reconcile_ids(PRO_io, self.PRO, PRO_header)
@@ -376,14 +403,10 @@ class LCAIO(object):
         # Combine all extensions as one
         units_str=pd.DataFrame([])
         for i in mrio.get_extensions(True):
-            # if necessary, turn single-index dataframes in multiIndex ones
-#            if (max_names > 1 and bo_singleIndex and not isinstance(i.S.index, pd.core.index.MultiIndex)):
-# TODO: NEEDS TESTING next line
             i.S.index = augment_index(i.S.index, max_names)
             self.F_io = pd.concat([self.F_io, i.S])
             units_str = pd.concat([units_str, i.unit])
             self.F_io.index.names = max_headers
-
 
 
         # get STR labels and units (as last column)
@@ -425,6 +448,18 @@ class LCAIO(object):
     def extract_exiobase2_characterisation_factors(self,
             char_filename='characterisation_CREEA_version2.2.0.xlsx',
             xlschar_param=None, name_cols=[0]):
+        """Spécific method for reading Exiobase2 characterisation factors
+
+        Args
+        ----
+            - char_filename:    filename of spreadsheet to read
+            - xlschar_param:    Parameters to guide reading of spreadsheet
+                                    [if None, fallback to default parameters]
+            - name_cols:        List of columns to concatenate in the
+                                compilation of a fullname for each impact
+                                    [default, column 0]
+
+        """
 
         if xlschar_param is None:
             xlschar_param = {
@@ -490,6 +525,15 @@ class LCAIO(object):
         #       NAME, not impact?
 
     def to_matfile(self, filename, foreground=True, background=True):
+        """ Export foreground, background, or whole system to Matlab mat-file
+
+        Args
+        ----
+            filename
+            foreground: by default, export foreground
+            background: by default, export background
+
+        """
 
         csc = scipy.sparse.csc_matrix
 
@@ -507,7 +551,6 @@ class LCAIO(object):
                     'IMP_header':   np.atleast_2d(self.IMP.columns.values)
                    })
         elif background and not foreground:
-            print('Not tested')
             sio.savemat(filename, {
                     'A_gen': scipy.sparse.csc_matrix(self.A_bb.values),
                     'F_gen': scipy.sparse.csc_matrix(self.F_b.values),
@@ -558,35 +601,51 @@ class LCAIO(object):
         return new_iolabels, new_header
 
     def match_foreground_to_background(self):
+        """ Reorders rows of A_bf to match that of A_bb; and F_f to match F_b
+        """
 
+        # Reorder rows in F_f to match indexes of F_b
         F_f_new = self.F_f.reindex_axis(self.F_b.index, axis=0).fillna(0.0)
 
         if F_f_new.sum().sum() != self.F_f.sum().sum():
             raise ValueError('Some of the emissions are not conserved during'
-                    ' the re-indexing! Will not re-index F_f')
+                             ' the re-indexing! Will not re-index F_f')
         else:
             self.F_f = F_f_new
 
+        # Reorder rows in A_bf to match row order in A_bb
         A_bf_new = self.A_bf.reindex_axis(self.A_bb.index, axis=0).fillna(0.0)
         if A_bf_new.sum().sum() != self.A_bf.sum().sum():
             raise ValueError('Some of the product-flows are not conserved'
                     ' during the re-indexing! Will not re-index A_bf')
         else:
             self.A_bf = A_bf_new
-            
+
     def delete_processes_foreground(self, id_begone=[]):
+        """ Deletes a process in all foreground matrices
 
-            #bo_begone = np.zeros(self.PRO_f.shape[0], dtype=bool)
-            #for i in id_begone:
-            #    bo_begone += self.PRO_f.ix[:, self._ardaId_column] == i
+        Args
+        ----
+            id_begone: list of indexes of processes to remove
+        """
 
-            self.PRO_f = self.PRO_f.drop(id_begone, 0)
-            self.A_ff = self.A_ff.drop(id_begone, 0).drop(id_begone, 1)
-            self.A_bf = self.A_bf.drop(id_begone, 1)
-            self.F_f = self.F_f.drop(id_begone, 1)
-            self.y_f = self.y_f.drop(id_begone, 0)
+        self.PRO_f = self.PRO_f.drop(id_begone, 0)
+        self.A_ff = self.A_ff.drop(id_begone, 0).drop(id_begone, 1)
+        self.A_bf = self.A_bf.drop(id_begone, 1)
+        self.F_f = self.F_f.drop(id_begone, 1)
+        self.y_f = self.y_f.drop(id_begone, 0)
 
     def append_to_foreground(self, other, final_demand=False):
+        """ Add the foreground of another LCAIO object to this object
+
+        Args
+        ---
+            other: another PYLCAIO object from which to get the foreground to
+                   append
+
+            final_demand: Get foreground final demand (y_f) from that object as
+                          well [default=False]
+        """
 
         # check if no duplicate index in dataframes
         if len(self.A_ff.index.intersection(other.A_ff.index)) > 0:
@@ -636,6 +695,15 @@ class LCAIO(object):
 
 
     def increase_foreground_process_ids(self, shift=0, index_col=0):
+        """ Increase the ID of foreground processes by a given shift
+
+        Args
+        ----
+            - shift:        The value by which process IDs should be increased
+                                [default=0]
+            - index_col:    Column (in multiindex) with the indexes to increase
+                                [default= columns 0]
+        """
 
         self.PRO_f.ix[:, self._ardaId_column] += shift
 
@@ -671,13 +739,37 @@ class LCAIO(object):
                           sector_level_name='sector',
                           overwrite=False,
                           verbose=True):
+        """ Hybridize the LCA and EEIO parts of the inventory
+
+        Args
+        ----
+            * process_index:    index of process to be hybridized
+            * io_index:         index of EEIO sector to use as complement
+            * price
+            * doublecounted_intrasector: how much to remove intrasector
+                                         requirements from EEIO coefficients,
+                                         between 0 and 1. [Default 1]
+            * doublecounted_categories: tuple of categories of flows to be
+                                        removed from EEIO complement
+            * doublecounted_sectors: tuple of specific sectors that should be
+                                     removed from EEIO complement
+            * sector_level_name: Name of level in multiindex that holds the
+                                 sector names [Default: 'sector']
+            * overwrite: If process already hybridized (non-zero A_io_f entries)
+                         overwrite or not [default=True]
+                         - Note: useful option when hybridizing a few specific
+                           processes prior to batch hybridizing all processes
+
+            * verbose: Log warnings when process already hybridized
+                       [default=True]
+        """
 
         # Check whether there are already signs of hybrization, i.e., non-null
         # entries in self.A_io_f matrix
         if np.any(self.A_io_f.ix[:, process_index].values != 0):
             if not overwrite:
                 if verbose:
-                    msg = ("Non-zero entries in A_io_f for sector {}. It seems"
+                    msg = ("Non-zero entries in A_io_f for process {}. It seems"
                            " already hybridized. Aborting hybridization.")
                     self.log.warning(msg.format(process_index))
                 return
@@ -712,7 +804,20 @@ class LCAIO(object):
 
 # ----------------------LIFECYCLE CALCULATIONS -------------------------------
 #
-    def calc_lifecycle(self, stage):
+    def calc_lifecycle(self, stage='impacts'):
+        """ Simply calculates lifecycle production, emissions, or impacts
+        
+        Args
+        ----
+            * stage:    either 'production', 'emissions', or 'impacts'
+                        determines what is being calculated
+
+        Returns
+        -------
+            * either lifecycle production (x), or emissions (e) or impact (d)
+              vector
+
+        """
 
         I = pd.DataFrame(np.eye(len(self.A)),
                          index=self.A.index,
