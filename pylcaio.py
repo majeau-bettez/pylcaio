@@ -1,22 +1,100 @@
+"""pyLCAIO: handle and hybridize LCA and EEIO matrices
+
+This module defines a class (LCAIO) that can structure, manipulate, and
+facilitate the hybridization of lifecycle assessment (LCA) and environmentally
+extended input-output (EEIO) matrices.
+
+Dependencies
+-------------
+
+- numpy
+- pandas
+- scipy
+- copy
+- logging
+
+Though not strictly speaking a dependency, this module relies on the
+functionality of a pyMRIO object for reading in the IO tables.
+"""
+
 import numpy as np
 import pandas as pd
 import scipy.io as sio
 import scipy.sparse
-import sys
-import IPython
 import copy
 import logging
+# pylint: disable-msg=C0103
 
-sys.path.append('/home/bill/software/Python/Modules/')
-import matlab_tools as mlt
-import matrix_view as mtv
 
-class ArdaInventoryHybridizer(object):
-    """Object to handle an LCA inventory and hybridize it with an EEIO table
+class LCAIO(object):
+    """ Handles and hybridized LCA inventory matrices and EEIO tables
+
+    Object instance variables and notation:
+    --------------------------------------
+
+        Process labels:
+            - PRO_f  : foreground process metadata (IDs, names, unit, etc.)
+            - PRO_b  : background process metadata
+            - PRO_io : input-output process metadata
+            - PRO    : ALL concatenated process labels
+
+        Stressor/elementary flow/factor labes:
+            - STR     : LCA stressor metadata (IDs, names, compartment, etc.)
+            - STR_io  : IO extension metadata
+            - STR_all : ALL concatenated extension labels
+
+        Impact labels:
+            - IMP     : LCA impacts metadata (IDs, name, unit, etc.)
+            - IMP_io  : Input-output impacts metadata
+            - IMP_all : ALL concatenated impact labels
+
+        Key concatenated matrices:
+            A     : all normalized product requirements (technical coefficients)
+                    dimensions: all products X all products
+            F     : all normalized extensions
+                    dimensions: all extensions X all products
+            C_all : all characterisation factors
+                    dimensions: all impacts X all extensions
+
+        Indexes for submatrices:
+            _f : foreground submatrix
+            _b : background submatrix
+            _io: input-output submatrix
+
+            _bf: background X foreground
+            _io_f: input-output X foreground
+            ... and other combinations
+
+    Object methods
+    ---------------
+    - extract_background()
+    - extract_foreground()
+    - extract_io_background_from_pymrio()
+    - to_matfile()
+
+    - match_foreground_to_background()
+    - delete_processes_foreground()
+    - append_to_foreground()
+    - increase_foreground_process_ids()
+
+    - hybridize_process()
+    - calc_lifecycle()
+
     """
 
 
     def __init__(self, index_columns=[1], verbose=True):
+        """ Define LCAIO object
+
+        Args
+        ----
+            index_columns: specifies which column in the labels to use as ID
+                           [default 1]
+            verbose: whether to have logging on stream handler 
+                     [default true]
+        """
+
+        # INITIALIZE ATTRIBUTES
 
         # extended Labels
         self.PRO_f = pd.DataFrame()
@@ -63,7 +141,7 @@ class ArdaInventoryHybridizer(object):
         if verbose:
             ch = logging.StreamHandler()
             ch.setLevel(logging.INFO)
-        fh = logging.FileHandler('ArdaInventoryHybridizer.log')
+        fh = logging.FileHandler('lcaio.log')
         fh.setLevel(logging.INFO)
         aformat = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         formatter = logging.Formatter(aformat)
@@ -73,8 +151,9 @@ class ArdaInventoryHybridizer(object):
             ch.setFormatter(formatter)
             self.log.addHandler(ch)
 
-
+#=============================================================================
 # PROPERTIES
+#=============================================================================
     @property
     def PRO(self):
         """ Process/sector labels for whole system """
@@ -83,16 +162,21 @@ class ArdaInventoryHybridizer(object):
 
     @property
     def STR_all(self):
+        """
+        Extensions (stressor, factors, elementary flow) labels for whole system
+        """
         str_all = pd.concat([self.STR, self.STR_io], axis=0)
         return reorder_cols(str_all.fillna(''))
 
     @property
     def IMP_all(self):
+        """ Impact labels for whole system """
         imp = pd.concat([self.IMP, self.IMP_io], axis=0)
         return reorder_cols(imp.fillna(''))
 
     @property
     def A(self):
+        """ Technical coefficient matrix for whole system """
         a = pd.concat([     i2s(self.A_ff),
                  pd.concat([i2s(self.A_bf), i2s(self.A_bb)], axis=1),
                  pd.concat([i2s(self.A_io_f), i2s(self.A_io)], axis=1)], axis=0
@@ -101,6 +185,7 @@ class ArdaInventoryHybridizer(object):
                                                               ).fillna(0.0)
     @property
     def F(self):
+        """ Normalized extensions for whole system"""
         f= pd.concat([pd.concat([i2s(self.F_f), i2s(self.F_b)], axis=1),
                       pd.concat([i2s(self.F_io_f), i2s(self.F_io)], axis=1)],
                      axis=0)
@@ -109,56 +194,61 @@ class ArdaInventoryHybridizer(object):
 
     @property
     def C_all(self):
+        """ Characterisation factors for whole system """
         return concat_keep_order([i2s(self.C), i2s(self.C_io)],
                                  i2s(self.STR_all).index,
                                  order_axis=[1])
 
     @property
     def y(self):
+        """ Final demand for whole system """
         y_pro =  pd.concat([self.y_f, self.y_b], axis=0)
         return y_pro.reindex_axis(self.PRO.index, axis=0).fillna(0.0)
 
 #=============================================================================
 # METHODS
 #=============================================================================
-    def extract_labels_from_matdict(self, matdict, overrule):
+#
+# ---------------------- DATA INPUT AND OUTPUT--------------------------------
+#
+    def __extract_labels_from_matdict(self, matdict, overwrite):
 
-        if  (overrule or len(self.STR) == 0) and 'STR' in matdict:
-            STR = mlt.mine_nested_array(matdict['STR'])
+        if  (overwrite or len(self.STR) == 0) and 'STR' in matdict:
+            STR = mine_nested_array(matdict['STR'])
             self.STR = pd.DataFrame(
                             data=STR,
                             index=STR[:, self._arda_default_labels].T.tolist()
                             )
             try:
-                STR_header = mlt.mine_nested_array(matdict['STR_header'])
+                STR_header = mine_nested_array(matdict['STR_header'])
                 self.STR.columns = extract_header(STR_header)
             except:
                 pass
 
 
-        if  (overrule or len(self.PRO_b) == 0) and 'PRO_gen' in matdict:
-            PRO_b = mlt.mine_nested_array(matdict['PRO_gen'])
-            PRO_header = mlt.mine_nested_array(matdict['PRO_header'])
+        if  (overwrite or len(self.PRO_b) == 0) and 'PRO_gen' in matdict:
+            PRO_b = mine_nested_array(matdict['PRO_gen'])
+            PRO_header = mine_nested_array(matdict['PRO_header'])
             self.PRO_b = pd.DataFrame(
                     data=PRO_b,
                     columns = extract_header(PRO_header),
                     index=PRO_b[:, self._arda_default_labels].T.tolist()
                     )
 
-        if  (overrule or len(self.IMP) == 0) and 'IMP' in matdict:
-            IMP = mlt.mine_nested_array(matdict['IMP'])
-            IMP_header = mlt.mine_nested_array(matdict['IMP_header'])
+        if  (overwrite or len(self.IMP) == 0) and 'IMP' in matdict:
+            IMP = mine_nested_array(matdict['IMP'])
+            IMP_header = mine_nested_array(matdict['IMP_header'])
             self.IMP = pd.DataFrame(
                     data=IMP,
                     columns=extract_header(IMP_header),
                     index=IMP[:, self._arda_default_labels].T.tolist()
                     )
 
-        if  (overrule or len(self.PRO_f) == 0) and 'PRO_f' in matdict:
-            PRO_f = mlt.mine_nested_array(matdict['PRO_f'])
+        if  (overwrite or len(self.PRO_f) == 0) and 'PRO_f' in matdict:
+            PRO_f = mine_nested_array(matdict['PRO_f'])
             try:
                 PRO_header = extract_header(
-                        mlt.mine_nested_array(matdict['PRO_header']))
+                        mine_nested_array(matdict['PRO_header']))
             except:
                 if len(self.PRO_b.columns) == PRO_f.shape[1]:
                     PRO_header = self.PRO_b.columns
@@ -170,9 +260,11 @@ class ArdaInventoryHybridizer(object):
                     columns = PRO_header
                     )
 
-    def extract_background_from_matdict(self, matdict, overrule=True):
+    def extract_background(self, datasource, overwrite=True):
 
-        self.extract_labels_from_matdict(matdict, overrule)
+        matdict = sio.loadmat(datasource)
+
+        self.__extract_labels_from_matdict(matdict, overwrite)
 
         self.F_b = pd.DataFrame(data=matdict['F_gen'].toarray(),
                                 index=self.STR.index,
@@ -189,9 +281,11 @@ class ArdaInventoryHybridizer(object):
         except:
             pass
 
-    def extract_foreground_from_matdict(self, matdict, overrule=True):
+    def extract_foreground(self, datasource, overwrite=True):
 
-        self.extract_labels_from_matdict(matdict, overrule)
+        matdict = sio.loadmat(datasource)
+
+        self.__extract_labels_from_matdict(matdict, overwrite)
 
         self.A_ff = pd.DataFrame(data=matdict['A_ff'].toarray(),
                                  index=self.PRO_f.index,
@@ -210,30 +304,9 @@ class ArdaInventoryHybridizer(object):
         except:
             raise Warning('No final demand found')
 
-    def reconcile_ids(self, io_label, arda_label, header):
-
-        # calculate smallest id not conflicting with that of arda_label
-        a = np.max(arda_label.iloc[:,self._ardaId_column])
-        order_magnitude = int(np.math.floor(np.math.log10(abs(a))))
-        min_id = np.around(a, -order_magnitude) + 10**order_magnitude + 1
-        new_ids = np.array(
-                [i for i in range(min_id, min_id  + io_label.shape[0])]
-                ).reshape((io_label.shape[0], 1))
-
-        new_iolabels = np.hstack((io_label[:, :self._ardaId_column],
-                                  new_ids,
-                                  io_label[:, self._ardaId_column:]))
-        new_header = (header[: self._ardaId_column]
-                             + [arda_label.columns[self._ardaId_column]]
-                             + header[self._ardaId_column:])
-
-        return new_iolabels, new_header
 
     def extract_io_background_from_pymrio(self, mrio, pro_name_cols=None,
             str_name_cols=None,): 
-
-
-
 
         # Clean up MRIO
         mrio.reset_all_to_coefficients()
@@ -264,7 +337,7 @@ class ArdaInventoryHybridizer(object):
 #            PRO_header = ['FULL NAME'] + PRO_header
 
         # define some numeric ID for each process, put in second column
-        PRO_io, PRO_header= self.reconcile_ids(PRO_io, self.PRO, PRO_header)
+        PRO_io, PRO_header= self.__reconcile_ids(PRO_io, self.PRO, PRO_header)
 
         self.PRO_io = pd.DataFrame(PRO_io,
                                    #index=PRO_io[:,self._arda_default_labels].T.tolist(),
@@ -312,7 +385,7 @@ class ArdaInventoryHybridizer(object):
                                                    str_name_cols)
 
         # define some numeric ID for each stressor, put in second column
-        STR_io, STR_header= self.reconcile_ids(STR_io, self.STR, STR_header)
+        STR_io, STR_header= self.__reconcile_ids(STR_io, self.STR, STR_header)
 
         self.STR_io = pd.DataFrame(
                 STR_io,
@@ -385,7 +458,7 @@ class ArdaInventoryHybridizer(object):
         IMP = np.array([list(i) for i in self.C_io.index.values.tolist()],
                        dtype=object)
         IMP, IMP_header = generate_fullname(IMP, IMP_header, name_cols)
-        IMP, IMP_header = self.reconcile_ids(IMP, self.IMP, IMP_header)
+        IMP, IMP_header = self.__reconcile_ids(IMP, self.IMP, IMP_header)
 
         self.IMP_io = pd.DataFrame(index = self.C_io.index,
                                    columns = IMP_header,
@@ -394,23 +467,6 @@ class ArdaInventoryHybridizer(object):
         #       UNIT, not unit
         #       NAME, not impact?
 
-    def match_foreground_to_background(self):
-
-        F_f_new = self.F_f.reindex_axis(self.F_b.index, axis=0).fillna(0.0)
-
-        if F_f_new.sum().sum() != self.F_f.sum().sum():
-            raise ValueError('Some of the emissions are not conserved during'
-                    ' the re-indexing! Will not re-index F_f')
-        else:
-            self.F_f = F_f_new
-
-        A_bf_new = self.A_bf.reindex_axis(self.A_bb.index, axis=0).fillna(0.0)
-        if A_bf_new.sum().sum() != self.A_bf.sum().sum():
-            raise ValueError('Some of the product-flows are not conserved'
-                    ' during the re-indexing! Will not re-index A_bf')
-        else:
-            self.A_bf = A_bf_new
-            
     def to_matfile(self, filename, foreground=True, background=True):
 
         csc = scipy.sparse.csc_matrix
@@ -457,6 +513,45 @@ class ArdaInventoryHybridizer(object):
                     'IMP_header': np.atleast_2d(self.IMP_all.columns.values)
                     })
 
+
+# -------------------------MANIPULATE LCA INVENTORIES--------------------------
+#
+    def __reconcile_ids(self, io_label, arda_label, header):
+
+        # calculate smallest id not conflicting with that of arda_label
+        a = np.max(arda_label.iloc[:,self._ardaId_column])
+        order_magnitude = int(np.math.floor(np.math.log10(abs(a))))
+        min_id = np.around(a, -order_magnitude) + 10**order_magnitude + 1
+        new_ids = np.array(
+                [i for i in range(min_id, min_id  + io_label.shape[0])]
+                ).reshape((io_label.shape[0], 1))
+
+        new_iolabels = np.hstack((io_label[:, :self._ardaId_column],
+                                  new_ids,
+                                  io_label[:, self._ardaId_column:]))
+        new_header = (header[: self._ardaId_column]
+                             + [arda_label.columns[self._ardaId_column]]
+                             + header[self._ardaId_column:])
+
+        return new_iolabels, new_header
+
+    def match_foreground_to_background(self):
+
+        F_f_new = self.F_f.reindex_axis(self.F_b.index, axis=0).fillna(0.0)
+
+        if F_f_new.sum().sum() != self.F_f.sum().sum():
+            raise ValueError('Some of the emissions are not conserved during'
+                    ' the re-indexing! Will not re-index F_f')
+        else:
+            self.F_f = F_f_new
+
+        A_bf_new = self.A_bf.reindex_axis(self.A_bb.index, axis=0).fillna(0.0)
+        if A_bf_new.sum().sum() != self.A_bf.sum().sum():
+            raise ValueError('Some of the product-flows are not conserved'
+                    ' during the re-indexing! Will not re-index A_bf')
+        else:
+            self.A_bf = A_bf_new
+            
     def delete_processes_foreground(self, id_begone=[]):
 
             #bo_begone = np.zeros(self.PRO_f.shape[0], dtype=bool)
@@ -541,8 +636,9 @@ class ArdaInventoryHybridizer(object):
             self.y_f.index += shift
             self.A_bf.columns += shift
             self.F_f.columns += shift
-            
 
+# ------------------------HYBRIDIZATION---------------------------------------
+#
     def hybridize_process(self,
                           process_index,
                           io_index,
@@ -559,12 +655,14 @@ class ArdaInventoryHybridizer(object):
         if np.any(self.A_io_f.ix[:, process_index].values != 0):
             if not overwrite:
                 if verbose:
-                    msg = "Non-zero entries in A_io_f for sector {}. It seems already hybridized. Aborting hybridization."
+                    msg = ("Non-zero entries in A_io_f for sector {}. It seems"
+                           " already hybridized. Aborting hybridization.")
                     self.log.warning(msg.format(process_index))
                 return
             else:
                 if verbose:
-                    msg = "Non-zero entries in A_io_f for sector {}. About to overwrite them. These will be lost."
+                    msg = ("Non-zero entries in A_io_f for sector {}. About to"
+                           " overwrite them. These will be lost.")
                     self.log.warning(msg.format(process_index))
         all_sectors = self.A_io_f.index.get_level_values(sector_level_name)
 
@@ -590,6 +688,8 @@ class ArdaInventoryHybridizer(object):
         for i in doublecounted_sectors:
             self.A_io_f.ix[i, process_index] = 0.0
 
+# ----------------------LIFECYCLE CALCULATIONS -------------------------------
+#
     def calc_lifecycle(self, stage):
 
         I = pd.DataFrame(np.eye(len(self.A)),
@@ -608,7 +708,8 @@ class ArdaInventoryHybridizer(object):
         if stage == 'impacts':
             return d
 
-
+# -----------------------SUPPORTING MODULE FUNCTIONS--------------------------
+#
 def concat_keep_order(frame_list, index, axis=0, order_axis=[0]):
     c = pd.concat(frame_list, axis).fillna(0.0)
     for i in order_axis:
@@ -709,3 +810,49 @@ def augment_index(index, width=None, headers=None):
         index.names=headers
 
     return index
+def mine_nested_array(nested_array, null_value=0):
+    """
+    Loops through a numpy array of array of arrays... until we reach the data
+
+    For some reason, matlab structure labels are loaded by scipy as arrays of
+    arrays of arrays, which is most annoying. This quickly sort this out.
+
+    e.g.
+        In: a = np.array([[0]], dtype=object); a[0,0] = np.array([0, 1])
+        In: ec.mine_nested_array(a)
+        Out: array([0, 1])
+
+    """
+
+    def _mine(a):
+        """ Subfunction that handles the looping through the nested arrays"""
+        try:
+            b = a.copy()
+            __ = b.shape
+        except:
+            # Not a numpy array, return as is
+            return a
+
+        # Go deeper until you reach an array whith more than 1 entry
+        while b.shape == (1, 1):
+            b = b[0, 0]
+        while b.shape == (1,):
+            b = b[0]
+        if b.shape == (0,):
+            b = null_value
+
+        return b
+
+    # First. mine for a "real" array or data
+    c = _mine(nested_array)
+
+    try:
+        # Second. loop through all elements of this array, and mine them if
+        # they themselves contain nested arrays
+        for index, x in np.ndenumerate(c):
+            c[index] = _mine(x)
+    except:
+        pass  # probably mined-out something that is not an array, good
+
+    return c
+
