@@ -127,6 +127,7 @@ class LCAIO(object):
         self.F_io = pd.DataFrame()
         self.F_io_f = pd.DataFrame()
         self.C_io = pd.DataFrame()
+        self.y_io = pd.DataFrame()
 
         self.io_categories={}
 
@@ -202,7 +203,7 @@ class LCAIO(object):
     @property
     def y(self):
         """ Final demand for whole system """
-        y_pro =  pd.concat([self.y_f, self.y_b], axis=0)
+        y_pro =  pd.concat([self.y_f, self.y_b, self.y_io], axis=0)
         return y_pro.reindex_axis(self.PRO.index, axis=0).fillna(0.0)
 
 #=============================================================================
@@ -284,7 +285,9 @@ class LCAIO(object):
             self.y_b = pd.DataFrame(data=matdict['y_gen'].toarray(),
                                     index=self.PRO_b.index)
         except:
-            pass
+            self.log.info("Defined empty final demand from background y_b")
+            self.y_b = pd.DataFrame(data=np.zeros((self.A_bb.shape[0], 1)),
+                                    index=self.PRO_b.index)
 
     def extract_foreground(self, datasource, overwrite=True):
 
@@ -313,7 +316,10 @@ class LCAIO(object):
             self.y_f = pd.DataFrame(data=matdict['y_f'].toarray(),
                                     index=self.PRO_f.index)
         except:
-            raise Warning('No final demand found')
+            self.y_f = pd.DataFrame(data=np.zeros((self.A_ff.shape[0], 1)),
+                                    index=self.PRO_f.index)
+            self.log.info("Defined empty final demand from foreground y_f")
+
 
 
     def extract_io_background_from_pymrio(self, mrio, pro_name_cols=None,
@@ -410,6 +416,11 @@ class LCAIO(object):
 
         self.F_io_f = pd.DataFrame(index=self.F_io.index,
                                    columns=self.A_ff.columns).fillna(0.0)
+
+        # Define an empty final demand vector
+        self.y_io = pd.DataFrame(data=np.zeros((self.A_io.shape[0], 1)),
+                                index=self.PRO_io.index)
+        self.log.info("Defined empty final demand from IO, y_io")
 
     def extract_exiobase2_characterisation_factors(self,
             char_filename='characterisation_CREEA_version2.2.0.xlsx',
