@@ -262,7 +262,12 @@ class LCAIO(object):
 
     def extract_background(self, datasource, overwrite=True):
 
-        matdict = sio.loadmat(datasource)
+        try:
+            # Treat datasource as filename
+            matdict = sio.loadmat(datasource)
+        except OSError:
+            # Treat datasource as matlab dictionnary
+            matdict = datasource
 
         self.__extract_labels_from_matdict(matdict, overwrite)
 
@@ -283,7 +288,13 @@ class LCAIO(object):
 
     def extract_foreground(self, datasource, overwrite=True):
 
-        matdict = sio.loadmat(datasource)
+        try:
+            # Treat datasource as filename
+            matdict = sio.loadmat(datasource)
+        except OSError:
+            # Treat datasource as matlab dictionnary
+            matdict = datasource
+
 
         self.__extract_labels_from_matdict(matdict, overwrite)
 

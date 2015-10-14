@@ -116,8 +116,8 @@ class Testpylcaio(unittest.TestCase):
 
         a = pylcaio.LCAIO(1, verbose=False)
         b = pylcaio.LCAIO(1, verbose=False)
-        a.extract_background_from_matdict(self.matdict)
-        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_background(self.matdict)
+        a.extract_foreground(self.matdict)
 
         B = {}
         B['PRO_f'] = np.array([['foo', 10, 'kg']], dtype=object)
@@ -143,8 +143,8 @@ class Testpylcaio(unittest.TestCase):
 
         B['y_f'] = scipy.sparse.csc_matrix([[2.0]])
 
-        b.extract_background_from_matdict(self.matdict)
-        b.extract_foreground_from_matdict(B)
+        b.extract_background(self.matdict)
+        b.extract_foreground(B)
 
         a.append_to_foreground(b)
 
@@ -155,9 +155,9 @@ class Testpylcaio(unittest.TestCase):
     def test_import_and_export_matdict_keys_roundtrip(self):
 
         a = pylcaio.LCAIO(verbose=False)
-        a.extract_background_from_matdict(self.matdict)
+        a.extract_background(self.matdict)
         a.to_matfile('/tmp/test_background.mat', foreground=False, background=True)
-        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_foreground(self.matdict)
         a.to_matfile('/tmp/test_foreground.mat', foreground=True, background=False)
 
         fore = sio.loadmat( '/tmp/test_foreground.mat')
@@ -168,7 +168,7 @@ class Testpylcaio(unittest.TestCase):
     def test_extract_io_background_from_pymrio(self):
 
         a = pylcaio.LCAIO(verbose=False)
-        a.extract_background_from_matdict(self.matdict)
+        a.extract_background(self.matdict)
         a.extract_io_background_from_pymrio(self.mrio)
 
         # assertion1
@@ -180,12 +180,12 @@ class Testpylcaio(unittest.TestCase):
 
     def test_match_foreground_background_trivial(self):
         a = pylcaio.LCAIO(verbose=False)
-        a.extract_background_from_matdict(self.matdict)
-        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_background(self.matdict)
+        a.extract_foreground(self.matdict)
 
         b = pylcaio.LCAIO(verbose=False)
-        b.extract_background_from_matdict(self.matdict)
-        b.extract_foreground_from_matdict(self.matdict)
+        b.extract_background(self.matdict)
+        b.extract_foreground(self.matdict)
 
         a.match_foreground_to_background()
         assert(np.all(a.A_bf == b.A_bf))
@@ -193,8 +193,8 @@ class Testpylcaio(unittest.TestCase):
 
     def test_match_foreground_background(self):
         a = pylcaio.LCAIO(verbose=False)
-        a.extract_foreground_from_matdict(self.matdict)
-        a.extract_background_from_matdict(self.bigdict)
+        a.extract_foreground(self.matdict)
+        a.extract_background(self.bigdict)
         a.match_foreground_to_background()
         assert(np.all(a.A_bf.values == np.array([[0, 1],
                                                  [0, 0], # <--row5 insert here
@@ -205,15 +205,15 @@ class Testpylcaio(unittest.TestCase):
         
     def test_match_foreground_background_flowlosses(self):
         a = pylcaio.LCAIO(verbose=False)
-        a.extract_foreground_from_matdict(self.matdict)
-        a.extract_background_from_matdict(self.smalldict)
+        a.extract_foreground(self.matdict)
+        a.extract_background(self.smalldict)
         with self.assertRaises(ValueError):
             a.match_foreground_to_background()
 
 
     def test_delete_processes_foreground(self):
         a = pylcaio.LCAIO(1, verbose=False)
-        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_foreground(self.matdict)
         a.delete_processes_foreground([10005])
 
         # A 2X2 FOREGROUND
@@ -244,8 +244,8 @@ class Testpylcaio(unittest.TestCase):
         B['y_f'] = scipy.sparse.csc_matrix([[0.0]])
 
         b = pylcaio.LCAIO(1, verbose=False)
-        b.extract_background_from_matdict(self.matdict)
-        b.extract_foreground_from_matdict(B)
+        b.extract_background(self.matdict)
+        b.extract_foreground(B)
         pdt.assert_frame_equal(a.A_ff, b.A_ff)
         pdt.assert_frame_equal(a.F_f, b.F_f)
         pdt.assert_frame_equal(a.y_f, b.y_f)
@@ -256,8 +256,8 @@ class Testpylcaio(unittest.TestCase):
     def test_append_to_foreground_w_ValueError(self):
         a = pylcaio.LCAIO(verbose=False)
         b = pylcaio.LCAIO(verbose=False)
-        a.extract_foreground_from_matdict(self.matdict)
-        b.extract_foreground_from_matdict(self.matdict)
+        a.extract_foreground(self.matdict)
+        b.extract_foreground(self.matdict)
 
         with self.assertRaises(ValueError):
             a.append_to_foreground(b)
@@ -265,8 +265,8 @@ class Testpylcaio(unittest.TestCase):
     def test_append_to_foreground_with_final_demand(self):
         a = pylcaio.LCAIO(1, verbose=False)
         b = pylcaio.LCAIO(1, verbose=False)
-        a.extract_background_from_matdict(self.matdict)
-        b.extract_background_from_matdict(self.matdict)
+        a.extract_background(self.matdict)
+        b.extract_background(self.matdict)
 
         B = {}
         B['PRO_f'] = np.array([ ['foo', 10, 'kg']],
@@ -293,8 +293,8 @@ class Testpylcaio(unittest.TestCase):
 
         B['y_f'] = scipy.sparse.csc_matrix([[2.0]])
 
-        a.extract_foreground_from_matdict(self.matdict)
-        b.extract_foreground_from_matdict(B)
+        a.extract_foreground(self.matdict)
+        b.extract_foreground(B)
 
         a.append_to_foreground(b, final_demand=True)
 
@@ -328,8 +328,8 @@ class Testpylcaio(unittest.TestCase):
         index = [0, 1 , -1]
         a = pylcaio.LCAIO(index, verbose=False)
         b = pylcaio.LCAIO(index, verbose=False)
-        a.extract_foreground_from_matdict(self.matdict)
-        b.extract_foreground_from_matdict(self.matdict)
+        a.extract_foreground(self.matdict)
+        b.extract_foreground(self.matdict)
 
         with self.assertRaises(ValueError):
             a.append_to_foreground(b)
@@ -337,7 +337,7 @@ class Testpylcaio(unittest.TestCase):
     def test_append_to_foreground_multiindex(self):
         a = pylcaio.LCAIO([0,1,-1], verbose=False)
         b = pylcaio.LCAIO([0, 1, -1], verbose=False)
-        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_foreground(self.matdict)
 
         B = {}
         B['PRO_f'] = np.array([ ['foo', 10, 'kg']],
@@ -369,8 +369,8 @@ class Testpylcaio(unittest.TestCase):
 
         B['y_f'] = scipy.sparse.csc_matrix([[0]])
 
-        b.extract_background_from_matdict(self.matdict)
-        b.extract_foreground_from_matdict(B)
+        b.extract_background(self.matdict)
+        b.extract_foreground(B)
 
         a.append_to_foreground(b)
 
@@ -395,7 +395,7 @@ class Testpylcaio(unittest.TestCase):
 
     def test_change_process_ids(self):
         a = pylcaio.LCAIO([1], verbose=False)
-        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_foreground(self.matdict)
 
         a.increase_foreground_process_ids(70000)
 
@@ -410,8 +410,8 @@ class Testpylcaio(unittest.TestCase):
 
     def test_properties_singleindex(self):
         a = pylcaio.LCAIO([1], verbose=False)
-        a.extract_background_from_matdict(self.matdict)
-        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_background(self.matdict)
+        a.extract_foreground(self.matdict)
         a.extract_io_background_from_pymrio(self.mrio)
 
         a.A
@@ -422,8 +422,8 @@ class Testpylcaio(unittest.TestCase):
 
     def test_properties_multiindex(self):
         a = pylcaio.LCAIO([0,1], verbose=False)
-        a.extract_background_from_matdict(self.matdict)
-        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_background(self.matdict)
+        a.extract_foreground(self.matdict)
         a.extract_io_background_from_pymrio(self.mrio)
 
         a.A
@@ -437,8 +437,8 @@ class Testpylcaio(unittest.TestCase):
 
         # define arda inventory object and populate
         a = pylcaio.LCAIO([0,1], verbose=False)
-        a.extract_background_from_matdict(self.matdict)
-        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_background(self.matdict)
+        a.extract_foreground(self.matdict)
         a.extract_io_background_from_pymrio(self.mrio)
 
         # Define two categories of IO flows
@@ -471,8 +471,8 @@ class Testpylcaio(unittest.TestCase):
 
         # define arda inventory object and populate
         a = pylcaio.LCAIO([0,1], verbose=False)
-        a.extract_background_from_matdict(self.matdict)
-        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_background(self.matdict)
+        a.extract_foreground(self.matdict)
         a.extract_io_background_from_pymrio(self.mrio)
 
         # Define two categories of IO flows
@@ -498,8 +498,8 @@ class Testpylcaio(unittest.TestCase):
 
         # define arda inventory object and populate
         a = pylcaio.LCAIO([0,1], verbose=False)
-        a.extract_background_from_matdict(self.matdict)
-        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_background(self.matdict)
+        a.extract_foreground(self.matdict)
         a.extract_io_background_from_pymrio(self.mrio)
 
         # Define two categories of IO flows
@@ -525,8 +525,8 @@ class Testpylcaio(unittest.TestCase):
     def test_calc_lifecycle(self):
 
         a = pylcaio.LCAIO([0,1], verbose=False)
-        a.extract_background_from_matdict(self.matdict)
-        a.extract_foreground_from_matdict(self.matdict)
+        a.extract_background(self.matdict)
+        a.extract_foreground(self.matdict)
         x = a.calc_lifecycle('production')
         x0 = pd.DataFrame.from_dict(
                 {0: {('back03', 3): -0.25,
