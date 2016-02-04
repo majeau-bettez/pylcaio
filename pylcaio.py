@@ -345,7 +345,8 @@ class LCAIO(object):
 
 
 
-    def extract_io_background_from_pymrio(self, mrio, pro_name_cols=None, str_name_cols=None,):
+    def extract_io_background_from_pymrio(self, mrio, pro_name_cols=None,
+            str_name_cols=None,reconcile=True):
         """ Extract EEIO matrices from pyMRIO object
 
         Args
@@ -381,7 +382,8 @@ class LCAIO(object):
                                                    pro_name_cols)
 
         # define some numeric ID for each process, put in second column
-        PRO_io, PRO_header= self.__reconcile_ids(PRO_io, self.PRO, PRO_header)
+        if reconcile:
+            PRO_io, PRO_header= self.__reconcile_ids(PRO_io, self.PRO, PRO_header)
 
         self.PRO_io = pd.DataFrame(PRO_io,
                                    #index=PRO_io[:,self._arda_default_labels].T.tolist(),
@@ -425,7 +427,8 @@ class LCAIO(object):
                                                    str_name_cols)
 
         # define some numeric ID for each stressor, put in second column
-        STR_io, STR_header= self.__reconcile_ids(STR_io, self.STR, STR_header)
+        if reconcile:
+            STR_io, STR_header= self.__reconcile_ids(STR_io, self.STR, STR_header)
 
         self.STR_io = pd.DataFrame(
                 STR_io,
@@ -447,7 +450,7 @@ class LCAIO(object):
 
     def extract_exiobase2_characterisation_factors(self,
             char_filename='characterisation_CREEA_version2.2.0.xlsx',
-            xlschar_param=None, name_cols=[0]):
+            xlschar_param=None, name_cols=[0], reconcile=True):
         """Spécific method for reading Exiobase2 characterisation factors
 
         Args
@@ -515,7 +518,8 @@ class LCAIO(object):
         IMP = np.array([list(i) for i in self.C_io.index.values.tolist()],
                        dtype=object)
         IMP, IMP_header = generate_fullname(IMP, IMP_header, name_cols)
-        IMP, IMP_header = self.__reconcile_ids(IMP, self.IMP, IMP_header)
+        if reconcile:
+            IMP, IMP_header = self.__reconcile_ids(IMP, self.IMP, IMP_header)
 
         self.IMP_io = pd.DataFrame(index = self.C_io.index,
                                    columns = IMP_header,
@@ -584,9 +588,12 @@ class LCAIO(object):
     def __reconcile_ids(self, io_label, arda_label, header):
 
         # calculate smallest id not conflicting with that of arda_label
-        a = np.max(arda_label.iloc[:,self._ardaId_column])
-        order_magnitude = int(np.math.floor(np.math.log10(abs(a))))
-        min_id = np.around(a, -order_magnitude) + 10**order_magnitude + 1
+        try:
+            a = np.max(arda_label.iloc[:,self._ardaId_column])
+            order_magnitude = int(np.math.floor(np.math.log10(abs(a))))
+            min_id = np.around(a, -order_magnitude) + 10**order_magnitude + 1
+        except: # e.g. if no foregrouground and a == NaN
+            min_id = 1
         new_ids = np.array(
                 [i for i in range(min_id, min_id  + io_label.shape[0])]
                 ).reshape((io_label.shape[0], 1))
@@ -804,13 +811,14 @@ class LCAIO(object):
 
 # ----------------------LIFECYCLE CALCULATIONS -------------------------------
 #
-    def calc_lifecycle(self, stage='impacts'):
+    def calc_lifecycle(self, stage='impacts', perspective=None):
         """ Simply calculates lifecycle production, emissions, or impacts
         
         Args
         ----
             * stage:    either 'production', 'emissions', or 'impacts'
                         determines what is being calculated
+            * perspective:  
 
         Returns
         -------
@@ -822,7 +830,15 @@ class LCAIO(object):
         I = pd.DataFrame(np.eye(len(self.A)),
                          index=self.A.index,
                          columns=self.A.columns)
-        x = pd.DataFrame(np.linalg.solve(I-self.A, self.y), index = self.A.index)
+
+        if perspective == 'consumer':
+            y = pd.DataFrame(np.diag(self.y.squeeze()))
+            x = pd.DataFrame(np.linalg.solve(I-self.A, y),
+                             index = self.A.index,
+                             columns = self.A.index)
+        else:
+            x = pd.DataFrame(np.linalg.solve(I-self.A, self.y),
+                             index = self.A.index)
 
         if stage == 'production':
             return x
