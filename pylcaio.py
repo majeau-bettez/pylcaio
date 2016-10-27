@@ -82,7 +82,6 @@ class LCAIO(object):
 
     """
 
-
     def __init__(self, index_columns=[1], verbose=True):
         """ Define LCAIO object
 
@@ -118,7 +117,6 @@ class LCAIO(object):
 
         #self.A_fb = pd.DataFrame()
 
-
         self._arda_default_labels = index_columns
         self._ardaId_column = 1
 
@@ -129,7 +127,7 @@ class LCAIO(object):
         self.C_io = pd.DataFrame()
         self.y_io = pd.DataFrame()
 
-        self.io_categories={}
+        self.io_categories = {}
 
         self.hyb = pd.DataFrame(columns=['process_index',
                                          'io_index',
@@ -187,7 +185,7 @@ class LCAIO(object):
     @property
     def F(self):
         """ Normalized extensions for whole system"""
-        f= pd.concat([pd.concat([i2s(self.F_f), i2s(self.F_b)], axis=1),
+        f = pd.concat([pd.concat([i2s(self.F_f), i2s(self.F_b)], axis=1),
                       pd.concat([i2s(self.F_io_f), i2s(self.F_io)], axis=1)],
                      axis=0)
         return f.reindex_axis(self.STR_all.index, 0).reindex_axis(self.PRO.index,1
@@ -451,7 +449,7 @@ class LCAIO(object):
     def extract_exiobase2_characterisation_factors(self,
             char_filename='characterisation_CREEA_version2.2.0.xlsx',
             xlschar_param=None, name_cols=[0], reconcile=True):
-        """Spécific method for reading Exiobase2 characterisation factors
+        """Specific method for reading Exiobase2 characterisation factors
 
         Args
         ----
@@ -763,7 +761,7 @@ class LCAIO(object):
             * sector_level_name: Name of level in multiindex that holds the
                                  sector names [Default: 'sector']
             * overwrite: If process already hybridized (non-zero A_io_f entries)
-                         overwrite or not [default=True]
+                         overwrite or not [default=False]
                          - Note: useful option when hybridizing a few specific
                            processes prior to batch hybridizing all processes
 
