@@ -743,7 +743,7 @@ class LCAIO(object):
                           doublecounted_intrasector=1,
                           doublecounted_categories=tuple(),
                           doublecounted_sectors=tuple(),
-                          sector_level_name='sector',
+                          sector_level_name=None,
                           overwrite=False,
                           verbose=True):
         """ Hybridize the LCA and EEIO parts of the inventory
