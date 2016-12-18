@@ -8,11 +8,7 @@ import sys
 import pdb
 import pandas.util.testing as pdt
 import IPython
-
-sys.path.append('/home/bill/software/Python/Modules/')
-import matlab_tools as mlt
-import matrix_view as mtv
-sys.path.append('/home/bill/software/pymrio/')
+sys.path.append(r'C:\Users\Maxime\Desktop\Software\pymrio-master')
 import pymrio
 
 
@@ -93,9 +89,6 @@ class Testpylcaio(unittest.TestCase):
 
         self.bigdict['y_gen'] = scipy.sparse.csc_matrix(np.zeros((5, 1)))
         self.bigdict['F_gen'] = scipy.sparse.csc_matrix(np.zeros((3, 5)))
-
-        #-----------------
-
         self.smalldict = self.matdict.copy()
         self.smalldict['PRO_gen'] = np.array([['back01', 1, 'kg'],
                                             ['back03', 3, 'MJ'],
@@ -156,12 +149,12 @@ class Testpylcaio(unittest.TestCase):
 
         a = pylcaio.LCAIO(verbose=False)
         a.extract_background(self.matdict)
-        a.to_matfile('/tmp/test_background.mat', foreground=False, background=True)
+        a.to_matfile('/temp/test_background.mat', foreground=False, background=True)
         a.extract_foreground(self.matdict)
-        a.to_matfile('/tmp/test_foreground.mat', foreground=True, background=False)
+        a.to_matfile('/temp/test_foreground.mat', foreground=True, background=False)
 
-        fore = sio.loadmat( '/tmp/test_foreground.mat')
-        back = sio.loadmat( '/tmp/test_background.mat')
+        fore = sio.loadmat( '/temp/test_foreground.mat')
+        back = sio.loadmat( '/temp/test_background.mat')
 
         assert(len(self.matdict.keys() - fore.keys() - back.keys())==0)
 
@@ -447,7 +440,7 @@ class Testpylcaio(unittest.TestCase):
 
         # Hybridize, correcting for double counting in these two categories
         a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
-                0.1, doublecounted_categories=('material','energy'))
+                0.1, doublecounted_categories=('material','energy'), sector_level_name='sector')
 
         # assert that it got copied properly
         self.assertEqual(
@@ -481,13 +474,17 @@ class Testpylcaio(unittest.TestCase):
 
         # Hybridize, correcting for double counting in these two categories
         a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
-                0.1, doublecounted_categories=('material','energy'))
+                0.1, doublecounted_categories=('material','energy'), sector_level_name='sector')
+
+        # Hybridize, correcting for double counting in these two categories
+        a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
+                0.1, doublecounted_categories=('material','energy'), sector_level_name='sector')
 
         A_io_f_0 = a.A_io_f.copy()
 
         # Hybridize second time
         a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
-                1E9, doublecounted_categories=('material','energy'))
+                1E9, doublecounted_categories=('material','energy'), sector_level_name='sector')
 
         # assert that second hybridization did not happen
         assert_frames_equivalent(A_io_f_0, a.A_io_f)
@@ -508,14 +505,14 @@ class Testpylcaio(unittest.TestCase):
 
         # Hybridize, correcting for double counting in these two categories
         a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
-                0.1, doublecounted_categories=('material','energy'),
+                0.1, doublecounted_categories=('material','energy'), sector_level_name='sector',
                 overwrite=True, verbose=True)
 
         A_io_f_0 = a.A_io_f.copy()
 
         # Hybridize second time
         a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
-                1E9, doublecounted_categories=('material','energy'),
+                1E9, doublecounted_categories=('material','energy'), sector_level_name='sector',
                 overwrite=True, verbose=True)
 
         # assert that second hybridization DID happen
