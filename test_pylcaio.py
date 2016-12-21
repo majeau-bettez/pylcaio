@@ -10,6 +10,7 @@ import pandas.util.testing as pdt
 import IPython
 sys.path.append(r'C:\Users\Maxime\Desktop\Software\pymrio-master')
 import pymrio
+import os
 
 
 class Testpylcaio(unittest.TestCase):
@@ -146,15 +147,28 @@ class Testpylcaio(unittest.TestCase):
 
 
     def test_import_and_export_matdict_keys_roundtrip(self):
+        if os.name == 'nt':
+            a = pylcaio.LCAIO(verbose=False)
+            a.extract_background(self.matdict)
+            a.to_matfile('/temp/test_background.mat', foreground=False, background=True)
+            a.extract_foreground(self.matdict)
+            a.to_matfile('/temp/test_foreground.mat', foreground=True, background=False)
 
-        a = pylcaio.LCAIO(verbose=False)
-        a.extract_background(self.matdict)
-        a.to_matfile('/temp/test_background.mat', foreground=False, background=True)
-        a.extract_foreground(self.matdict)
-        a.to_matfile('/temp/test_foreground.mat', foreground=True, background=False)
+            fore = sio.loadmat('/temp/test_foreground.mat')
+            back = sio.loadmat('/temp/test_background.mat')
 
-        fore = sio.loadmat( '/temp/test_foreground.mat')
-        back = sio.loadmat( '/temp/test_background.mat')
+        else:
+            a = pylcaio.LCAIO(verbose=False)
+            a.extract_background(self.matdict)
+            a.to_matfile('/tmp/test_background.mat', foreground=False, background=True)
+            a.extract_foreground(self.matdict)
+            a.to_matfile('/tmp/test_foreground.mat', foreground=True, background=False)
+
+            fore = sio.loadmat('/tmp/test_foreground.mat')
+            back = sio.loadmat('/tmp/test_background.mat')
+
+
+
 
         assert(len(self.matdict.keys() - fore.keys() - back.keys())==0)
 
