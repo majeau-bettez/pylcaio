@@ -785,7 +785,11 @@ class LCAIO(object):
                     msg = ("Non-zero entries in A_io_f for sector {}. About to"
                            " overwrite them. These will be lost.")
                     self.log.warning(msg.format(process_index))
-        all_sectors = self.A_io_f.index.get_level_values(sector_level_name)
+        try:
+            all_sectors = self.A_io_f.index.get_level_values(sector_level_name)
+        except KeyError:
+            all_sectors = self.A_io_f.index.get_level_values('sector')
+
 
         # input structures of sector to hybridize
         self.A_io_f.ix[:, process_index] = self.A_io.ix[:, io_index] * price
