@@ -743,7 +743,7 @@ class LCAIO(object):
                           doublecounted_intrasector=1,
                           doublecounted_categories=tuple(),
                           doublecounted_sectors=tuple(),
-                          sector_level_name=None,
+                          sector_level_name='sector',
                           overwrite=False,
                           verbose=True):
         """ Hybridize the LCA and EEIO parts of the inventory
@@ -788,7 +788,11 @@ class LCAIO(object):
         try:
             all_sectors = self.A_io_f.index.get_level_values(sector_level_name)
         except KeyError:
-            all_sectors = self.A_io_f.index.get_level_values('sector')
+            try:
+                all_sectors = self.A_io_f.index.get_level_values(None)
+            except KeyError:
+                all_sectors = self.A_io_f.index.get_level_values(sector_level_name)
+                print(sector_level_name + 'is different from the sector_level_name entered in A_io_f')
 
 
         # input structures of sector to hybridize
