@@ -895,7 +895,7 @@ def generate_fullname(label, header, name_cols):
     return label, header
 
 def reorder_cols(a):
-    cols = a.columns - ['FULLNAME', 'MATRIXID','UNIT']
+    cols = a.columns.difference(['FULLNAME', 'MATRIXID','UNIT'])
     sorted_cols = ['FULLNAME','MATRIXID'] + cols.tolist() + ['UNIT']
     return a.reindex_axis(sorted_cols, 1)
 
