@@ -5,9 +5,7 @@ import pandas as pd
 import scipy.io as sio
 import scipy.sparse
 import sys
-import pdb
 import pandas.util.testing as pdt
-import IPython
 sys.path.append(r'C:\Users\Maxime\Desktop\Software\pymrio-master')
 import pymrio
 import os
@@ -147,28 +145,20 @@ class Testpylcaio(unittest.TestCase):
 
 
     def test_import_and_export_matdict_keys_roundtrip(self):
+
         if os.name == 'nt':
-            a = pylcaio.LCAIO(verbose=False)
-            a.extract_background(self.matdict)
-            a.to_matfile('/temp/test_background.mat', foreground=False, background=True)
-            a.extract_foreground(self.matdict)
-            a.to_matfile('/temp/test_foreground.mat', foreground=True, background=False)
-
-            fore = sio.loadmat('/temp/test_foreground.mat')
-            back = sio.loadmat('/temp/test_background.mat')
-
+            temporary = '/temp/'
         else:
-            a = pylcaio.LCAIO(verbose=False)
-            a.extract_background(self.matdict)
-            a.to_matfile('/tmp/test_background.mat', foreground=False, background=True)
-            a.extract_foreground(self.matdict)
-            a.to_matfile('/tmp/test_foreground.mat', foreground=True, background=False)
+            temporary = '/tmp/'
 
-            fore = sio.loadmat('/tmp/test_foreground.mat')
-            back = sio.loadmat('/tmp/test_background.mat')
+        a = pylcaio.LCAIO(verbose=False)
+        a.extract_background(self.matdict)
+        a.to_matfile(temporary + 'test_background.mat', foreground=False, background=True)
+        a.extract_foreground(self.matdict)
+        a.to_matfile(temporary + 'test_foreground.mat', foreground=True, background=False)
 
-
-
+        fore = sio.loadmat(temporary + 'test_foreground.mat')
+        back = sio.loadmat(temporary + 'test_background.mat')
 
         assert(len(self.matdict.keys() - fore.keys() - back.keys())==0)
 
@@ -454,7 +444,7 @@ class Testpylcaio(unittest.TestCase):
 
         # Hybridize, correcting for double counting in these two categories
         a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
-                0.1, doublecounted_categories=('material','energy'), sector_level_name='sector')
+                0.1, doublecounted_categories=('material','energy'))
 
         # assert that it got copied properly
         self.assertEqual(
@@ -488,17 +478,17 @@ class Testpylcaio(unittest.TestCase):
 
         # Hybridize, correcting for double counting in these two categories
         a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
-                0.1, doublecounted_categories=('material','energy'), sector_level_name='sector')
+                0.1, doublecounted_categories=('material','energy'))
 
         # Hybridize, correcting for double counting in these two categories
         a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
-                0.1, doublecounted_categories=('material','energy'), sector_level_name='sector')
+                0.1, doublecounted_categories=('material','energy'))
 
         A_io_f_0 = a.A_io_f.copy()
 
         # Hybridize second time
         a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
-                1E9, doublecounted_categories=('material','energy'), sector_level_name='sector')
+                1E9, doublecounted_categories=('material','energy'))
 
         # assert that second hybridization did not happen
         assert_frames_equivalent(A_io_f_0, a.A_io_f)
@@ -519,14 +509,14 @@ class Testpylcaio(unittest.TestCase):
 
         # Hybridize, correcting for double counting in these two categories
         a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
-                0.1, doublecounted_categories=('material','energy'), sector_level_name='sector',
+                0.1, doublecounted_categories=('material','energy'),
                 overwrite=True, verbose=True)
 
         A_io_f_0 = a.A_io_f.copy()
 
         # Hybridize second time
         a.hybridize_process(('Batt Packing', 10002), ('reg2', 'transport'),
-                1E9, doublecounted_categories=('material','energy'), sector_level_name='sector',
+                1E9, doublecounted_categories=('material','energy'),
                 overwrite=True, verbose=True)
 
         # assert that second hybridization DID happen
